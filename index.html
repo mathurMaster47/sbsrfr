@@ -1820,9 +1820,11 @@
             }
 
             activateShield() {
+                // Manual shield activation (optional - shields also auto-activate on collision)
                 if (userData.Shields > 0 && this.activePowerups.Shield <= 0) {
                     userData.Shields--;
                     this.activePowerups.Shield = 20;
+                    this.ShieldMesh.visible = true;
                     SaveSystem.save(userData);
                     this.updateUI();
                 }
@@ -2101,12 +2103,34 @@
                         // Check collision cooldown
                         if (this.collisionCooldown > 0) continue;
 
+                        // First check if player has shields in inventory (auto-protect)
+                        if (userData.Shields > 0) {
+                            // Auto-activate and consume a shield
+                            userData.Shields--;
+                            SaveSystem.save(userData);
+                            audio.playCrash();
+                            this.triggerCopReappearance();
+                            this.bouncePlayerBack();
+                            // Show shield briefly
+                            this.ShieldMesh.visible = true;
+                            setTimeout(() => {
+                                this.ShieldMesh.visible = false;
+                            }, 500);
+                            // Remove obstacle to prevent repeated collision
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+                            continue;
+                        }
+
+                        // Then check if shield is already active
                         if (this.activePowerups.Shield > 0) {
                             this.activePowerups.Shield = 0;
                             audio.playCrash();
                             this.triggerCopReappearance();
-                            // Bounce back player
                             this.bouncePlayerBack();
+                            // Remove obstacle to prevent repeated collision
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
                             continue;
                         }
 
@@ -2171,6 +2195,11 @@
                     this.jetpackMesh.visible = (this.activePowerups.jetpack > 0);
                 }
 
+                // Shield Visibility Toggle
+                if (this.ShieldMesh) {
+                    this.ShieldMesh.visible = (this.activePowerups.Shield > 0);
+                }
+
                 // Reset transform every frame so sliding/ducking & climbing return to baseline
                 this.playerRig.rotation.x = 0;
                 this.playerRig.scale.set(1, 1, 1);
@@ -2219,7 +2248,7 @@
                 const itemsList = document.getElementById('shop-items-list');
                 itemsList.innerHTML = '';
                 const shopData = [
-                    { id: 'Shield', name: 'Shield Shield', cost: 100 },
+                    { id: 'Shield', name: 'Shield', cost: 100 },
                     { id: 'magnet', name: 'Magnet Duration', cost: 150 },
                     { id: 'jetpack', name: 'Jetpack Duration', cost: 200 }
                 ];
