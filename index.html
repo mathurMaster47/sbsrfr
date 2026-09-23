@@ -1111,14 +1111,14 @@
             initPursuers() {
                 // Create cop character
                 this.copGroup = this.createCopModel();
-                this.copGroup.position.set(0, 0, 8); // Start behind player
-                this.copGroup.scale.set(1.8, 1.8, 1.8);
+                this.copGroup.position.set(0, 0, 4); // Behind player (between player and camera)
+                this.copGroup.scale.set(2.2, 2.2, 2.2); // Make them bigger and more visible
                 this.scene.add(this.copGroup);
 
                 // Create dog character
                 this.dogGroup = this.createDogModel();
-                this.dogGroup.position.set(1.2, 0, 9); // Start behind and to the side
-                this.dogGroup.scale.set(1.8, 1.8, 1.8);
+                this.dogGroup.position.set(1.8, 0, 5); // Behind and to the side
+                this.dogGroup.scale.set(2.2, 2.2, 2.2); // Make them bigger and more visible
                 this.scene.add(this.dogGroup);
 
                 this.copAnimPhase = 0;
@@ -1131,7 +1131,7 @@
 
                 // Make cop follow player with slight delay and offset
                 const copTargetX = this.posX * 0.6; // Follow but with some lag
-                const copTargetZ = 8 + (this.speed * 0.1); // Maintain distance based on speed
+                const copTargetZ = 4 + (this.speed * 0.1); // Maintain distance behind player
 
                 this.copGroup.position.x += (copTargetX - this.copGroup.position.x) * 0.08;
                 this.copGroup.position.z = copTargetZ;
@@ -1674,10 +1674,10 @@
 
                 // Reset cop and dog positions
                 if (this.copGroup) {
-                    this.copGroup.position.set(0, 0, 8);
+                    this.copGroup.position.set(0, 0, 4);
                 }
                 if (this.dogGroup) {
-                    this.dogGroup.position.set(1.2, 0, 9);
+                    this.dogGroup.position.set(1.8, 0, 5);
                 }
 
                 for (let i = 0; i < CONFIG.VISIBLE_SEGMENTS; i++) {
