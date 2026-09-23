@@ -518,6 +518,14 @@
                 this.init();
                 this.playTone(80, 'sawtooth', 0.35, 0.3);
             }
+
+            playPoliceWarning() {
+                this.init();
+                // Police siren sound
+                [440, 520, 440, 520].forEach((f, i) => {
+                    setTimeout(() => this.playTone(f, 'square', 0.2, 0.15), i * 150);
+                });
+            }
         }
 
         const audio = new SoundEngine();
@@ -1040,16 +1048,16 @@
                 belt.position.y = 0.8;
                 copGroup.add(belt);
 
-                // Gun (hidden initially)
-                const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.25, 8), gunMat);
+                // Gun (hidden initially) - made larger for visibility
+                const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 8), gunMat);
                 gunBarrel.rotation.z = Math.PI / 2;
-                gunBarrel.position.set(0.65, 1.3, 0.2);
+                gunBarrel.position.set(0.7, 1.3, 0.3);
                 gunBarrel.visible = false;
                 copGroup.add(gunBarrel);
                 copGroup.userData.gun = gunBarrel;
 
-                const gunHandle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.03), gunMat);
-                gunHandle.position.set(0.65, 1.2, 0.2);
+                const gunHandle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 0.04), gunMat);
+                gunHandle.position.set(0.7, 1.15, 0.3);
                 gunHandle.visible = false;
                 copGroup.add(gunHandle);
                 copGroup.userData.gunHandle = gunHandle;
@@ -1142,6 +1150,8 @@
                 this.copFadeTimer = 10; // 10 seconds before fading
                 this.copReappearTimer = 0; // Timer for reappearance after hits
                 this.copFatalEncounter = false; // For fatal collision scenario
+                this.policeWarningCount = 0; // Track how many times police has warned player
+                this.collisionCooldown = 0; // Cooldown after collision
             }
 
             /* --- TRIGGER COP REAPPEARANCE AFTER NON-FATAL HIT --- */
@@ -1149,6 +1159,11 @@
                 this.copVisible = true;
                 this.copReappearTimer = 20; // 20 seconds before fading again
                 this.copFadeTimer = 10; // Reset fade timer
+                this.policeWarningCount++; // Increment warning count
+                this.collisionCooldown = 1.0; // 1 second cooldown
+
+                // Play police warning sound
+                audio.playPoliceWarning();
 
                 // Make cop and dog visible immediately
                 this.copGroup.visible = true;
@@ -1165,6 +1180,49 @@
                         child.material.opacity = 1;
                     }
                 });
+
+                // If this is the second warning, show gun but don't end game yet
+                if (this.policeWarningCount >= 2) {
+                    this.showCopGun();
+                }
+            }
+
+            /* --- SHOW COP GUN WITHOUT ENDING GAME --- */
+            showCopGun() {
+                if (this.copGroup.userData.gun) {
+                    this.copGroup.userData.gun.visible = true;
+                }
+                if (this.copGroup.userData.gunHandle) {
+                    this.copGroup.userData.gunHandle.visible = true;
+                }
+                // Position cop closer to show threat
+                this.copGroup.position.set(this.posX * 0.8, 0, 3);
+                this.copGroup.lookAt(this.posX, 1.5, this.posZ - 5);
+            }
+
+            /* --- BOUNCE PLAYER BACK AFTER COLLISION --- */
+            bouncePlayerBack() {
+                // Bounce player back in the opposite direction
+                const bounceDirection = this.posX > 0 ? -1 : 1;
+                const bounceDistance = 1.5;
+
+                // Force lane change (move away from collision)
+                if (this.currentLane > 0 && bounceDirection < 0) {
+                    this.currentLane--;
+                    this.targetX = CONFIG.LANES[this.currentLane];
+                } else if (this.currentLane < 2 && bounceDirection > 0) {
+                    this.currentLane++;
+                    this.targetX = CONFIG.LANES[this.currentLane];
+                } else {
+                    // If at edge, move toward center
+                    this.currentLane = 1;
+                    this.targetX = CONFIG.LANES[this.currentLane];
+                }
+
+                // Add temporary bounce effect
+                this.posX = this.targetX; // Immediate position change
+                this.velY = 0.2; // Bounce up
+                this.isJumping = true;
             }
 
             /* --- TRIGGER FATAL ENCOUNTER WITH COP PULLING GUN --- */
@@ -1172,7 +1230,7 @@
                 this.copFatalEncounter = true;
                 this.copVisible = true;
 
-                // Make cop visible and immediately show gun
+                // Make cop visible immediately
                 this.copGroup.visible = true;
                 this.dogGroup.visible = true;
                 this.copGroup.traverse(child => {
@@ -1188,17 +1246,21 @@
                     }
                 });
 
-                // Show gun
-                if (this.copGroup.userData.gun) {
-                    this.copGroup.userData.gun.visible = true;
-                }
-                if (this.copGroup.userData.gunHandle) {
-                    this.copGroup.userData.gunHandle.visible = true;
-                }
-
-                // Position cop closer to player for dramatic effect
-                this.copGroup.position.set(this.posX * 0.8, 0, 2);
+                // Dramatic sequence: cop approaches and gets ready
+                this.copGroup.position.set(this.posX * 0.6, 0, 6); // Start further back
                 this.copGroup.lookAt(this.posX, 1.5, this.posZ - 5);
+
+                // Show gun after brief delay for dramatic effect
+                setTimeout(() => {
+                    if (this.copGroup.userData.gun) {
+                        this.copGroup.userData.gun.visible = true;
+                    }
+                    if (this.copGroup.userData.gunHandle) {
+                        this.copGroup.userData.gunHandle.visible = true;
+                    }
+                    // Move cop closer for final confrontation
+                    this.copGroup.position.set(this.posX * 0.8, 0, 2);
+                }, 500); // 0.5 second delay before showing gun
             }
 
             /* --- UPDATE COP AND DOG PURSUERS --- */
@@ -1818,6 +1880,8 @@
                 this.copFadeTimer = 10;
                 this.copReappearTimer = 0;
                 this.copFatalEncounter = false;
+                this.policeWarningCount = 0;
+                this.collisionCooldown = 0;
 
                 for (let i = 0; i < CONFIG.VISIBLE_SEGMENTS; i++) {
                     this.createSegment(-i * CONFIG.SEGMENT_LENGTH);
@@ -1876,6 +1940,11 @@
 
                 for (let key in this.activePowerups) {
                     if (this.activePowerups[key] > 0) this.activePowerups[key] -= delta;
+                }
+
+                // Decrease collision cooldown
+                if (this.collisionCooldown > 0) {
+                    this.collisionCooldown -= delta;
                 }
 
                 this.posX += (this.targetX - this.posX) * 0.35;
@@ -2029,33 +2098,64 @@
                     if (!isRampClimbing && checkAABB(this.posX, this.posY + pY, 0, pW, pH, pW, obs.position.x, obs.userData.y + (obs.userData.h/2), obs.position.z, obs.userData.w, obs.userData.h, obs.userData.d)) {
                         if (this.activePowerups.jetpack > 0) continue;
 
+                        // Check collision cooldown
+                        if (this.collisionCooldown > 0) continue;
+
                         if (this.activePowerups.hoverboard > 0) {
                             this.activePowerups.hoverboard = 0;
                             audio.playCrash();
-                            this.scene.remove(obs);
-                            this.activeObstacles.splice(i, 1);
-                            // Non-fatal hit - make cop reappear
                             this.triggerCopReappearance();
+                            // Bounce back player
+                            this.bouncePlayerBack();
                             continue;
                         }
 
-                        // Check if this is a fatal collision (train collision)
-                        const isFatalCollision = (obs.userData.type === 'train' || obs.userData.type === 'moving_train');
+                        // Determine collision type and severity
+                        const isTrainCollision = (obs.userData.type === 'train' || obs.userData.type === 'moving_train');
+                        const isHeadOnCollision = (Math.abs(this.posX - obs.position.x) < 0.5); // Direct hit
+                        const isSideCollision = !isHeadOnCollision;
 
-                        if (isFatalCollision) {
-                            // Fatal collision - cop pulls out gun
+                        if (isTrainCollision && isHeadOnCollision) {
+                            // Fatal head-on train collision - dramatic sequence
                             this.triggerFatalEncounter();
-                            let deathMsg = "Slammed into train!";
-                            if (obs.userData.type === 'hurdle') deathMsg = "Slammed into barrier!";
-                            else if (obs.userData.type === 'cones') deathMsg = "Crashed into construction cones!";
 
-                            this.gameOver(deathMsg);
-                            return;
-                        } else {
-                            // Non-fatal collision (sideways hit on obstacles)
+                            // Remove train to prevent repeated collision during sequence
                             this.scene.remove(obs);
                             this.activeObstacles.splice(i, 1);
+
+                            // Delay game over to show the gun drawing sequence
+                            setTimeout(() => {
+                                let deathMsg = "Slammed into train!";
+                                this.gameOver(deathMsg);
+                            }, 1000); // 1 second delay to show cop pulling gun
+                            return;
+                        } else if (isTrainCollision && isSideCollision) {
+                            // Side train collision - bounce back and police warning
+                            audio.playCrash();
                             this.triggerCopReappearance();
+                            this.bouncePlayerBack();
+
+                            // Remove train to prevent repeated collision
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+
+                            // Check if police should catch player (after 2 warnings)
+                            if (this.policeWarningCount >= 2) {
+                                setTimeout(() => {
+                                    let deathMsg = "Caught by police!";
+                                    this.gameOver(deathMsg);
+                                }, 500);
+                                return;
+                            }
+                        } else {
+                            // Non-train obstacle collision - bounce back and warning
+                            audio.playCrash();
+                            this.triggerCopReappearance();
+                            this.bouncePlayerBack();
+
+                            // Remove obstacle
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
                             continue;
                         }
                     }
