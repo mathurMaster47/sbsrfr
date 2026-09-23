@@ -1090,7 +1090,8 @@
                     });
                 }
 
-                const zOffsets = isTunnelSegment ? [zPos - 24, zPos - 42] : [zPos - 12, zPos - 30];
+                // Increased spacing to prevent train overlap (trains are 14 units deep)
+                const zOffsets = isTunnelSegment ? [zPos - 28, zPos - 52] : [zPos - 15, zPos - 38];
                 zOffsets.forEach((spZ) => {
                     // Reserve the same lane for the entire segment so adjacent waves
                     // cannot combine into a three-lane dead end.
@@ -1102,7 +1103,21 @@
                         const isRamp = (laneIdx === rampLaneIdx) || Math.random() < 0.12;
                         const isMoving = Math.random() < 0.12;
 
-                        this.createTrain(laneX, spZ, isRamp, isMoving);
+                        // Check if this position would overlap with existing trains
+                        const wouldOverlap = this.activeObstacles.some(obs => {
+                            if (obs.userData.type === 'train' || obs.userData.type === 'moving_train') {
+                                const zDist = Math.abs(obs.position.z - spZ);
+                                const xDist = Math.abs(obs.position.x - laneX);
+                                // Trains overlap if they're too close in Z and in same lane
+                                return zDist < 16 && xDist < 1.0;
+                            }
+                            return false;
+                        });
+
+                        // Only spawn train if no overlap detected
+                        if (!wouldOverlap) {
+                            this.createTrain(laneX, spZ, isRamp, isMoving);
+                        }
                     });
                 });
 
