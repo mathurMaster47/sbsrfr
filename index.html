@@ -127,7 +127,7 @@
             align-items: flex-end;
             width: 100%;
         }
-        .hoverboard-status {
+        .Shield-status {
             background: rgba(255, 0, 85, 0.3);
             border: 2px solid #ff0055;
             color: #fff;
@@ -328,8 +328,8 @@
             </div>
 
             <div class="hud-bottom">
-                <div class="hoverboard-status" id="board-indicator">
-                    🛹 HOVERBOARD: <span id="board-count">0</span> (Press SPACE / Double Tap)
+                <div class="Shield-status" id="board-indicator">
+                    🛹 Shield: <span id="board-count">0</span> (Press SPACE / Double Tap)
                 </div>
                 <div style="color: rgba(255,255,255,0.9); font-size: 12px; font-weight: bold;">
                     WASD / Arrows to Move | Space for Board
@@ -696,7 +696,7 @@
         /* --- DATA PERSISTENCE --- */
         class SaveSystem {
             static load() {
-                const def = { highScore: 0, coins: 0, hoverboards: 5 };
+                const def = { highScore: 0, coins: 0, Shields: 5 };
                 try {
                     const s = localStorage.getItem('subway_surfer_data');
                     return s ? Object.assign(def, JSON.parse(s)) : def;
@@ -745,7 +745,7 @@
                     tree: null
                 };
 
-                this.activePowerups = { magnet: 0, jetpack: 0, sneakers: 0, hoverboard: 0 };
+                this.activePowerups = { magnet: 0, jetpack: 0, sneakers: 0, Shield: 0 };
 
                 this.activeSegments = [];
                 this.activeObstacles = [];
@@ -922,9 +922,9 @@
                 boardMeshGroup.add(boardBody); boardMeshGroup.add(stripe);
                 boardMeshGroup.position.set(0, -0.05, 0);
 
-                this.hoverboardMesh = boardMeshGroup;
-                this.hoverboardMesh.visible = false;
-                this.playerGroup.add(this.hoverboardMesh);
+                this.ShieldMesh = boardMeshGroup;
+                this.ShieldMesh.visible = false;
+                this.playerGroup.add(this.ShieldMesh);
 
                 // CLEAN 3D JETPACK MODEL (TWIN ROCKET NOZZLES - NO REVOLVER ARTIFACT)
                 this.jetpackMesh = new THREE.Group();
@@ -978,7 +978,7 @@
 
                     this.playerRig.clear();
                     this.playerRig.add(model);
-                    this.playerRig.add(this.hoverboardMesh);
+                    this.playerRig.add(this.ShieldMesh);
                     this.playerRig.add(this.jetpackMesh);
                 }, undefined, (error) => {
                     console.warn('Boy asset could not be loaded; using the built-in runner.', error);
@@ -1754,7 +1754,7 @@
 
                 if (distance < 32) {
                     if (now - this.lastTapTime < 350) {
-                        this.activateHoverboard();
+                        this.activateShield();
                         this.lastTapTime = 0;
                     } else {
                         this.lastTapTime = now;
@@ -1784,7 +1784,7 @@
                 else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.moveRight();
                 else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.jump();
                 else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.slide();
-                else if (e.key === ' ') this.activateHoverboard();
+                else if (e.key === ' ') this.activateShield();
             }
 
             moveLeft() {
@@ -1819,10 +1819,10 @@
                 }
             }
 
-            activateHoverboard() {
-                if (userData.hoverboards > 0 && this.activePowerups.hoverboard <= 0) {
-                    userData.hoverboards--;
-                    this.activePowerups.hoverboard = 20;
+            activateShield() {
+                if (userData.Shields > 0 && this.activePowerups.Shield <= 0) {
+                    userData.Shields--;
+                    this.activePowerups.Shield = 20;
                     SaveSystem.save(userData);
                     this.updateUI();
                 }
@@ -2101,8 +2101,8 @@
                         // Check collision cooldown
                         if (this.collisionCooldown > 0) continue;
 
-                        if (this.activePowerups.hoverboard > 0) {
-                            this.activePowerups.hoverboard = 0;
+                        if (this.activePowerups.Shield > 0) {
+                            this.activePowerups.Shield = 0;
                             audio.playCrash();
                             this.triggerCopReappearance();
                             // Bounce back player
@@ -2177,7 +2177,7 @@
 
                 if (this.activePowerups.jetpack > 0) {
                     this.playerRig.rotation.x = Math.PI / 6;
-                } else if (this.activePowerups.hoverboard > 0) {
+                } else if (this.activePowerups.Shield > 0) {
                     this.playerRig.rotation.x = 0;
                 } else if (this.isClimbingRamp) {
                     this.playerRig.rotation.x = -Math.PI / 8;
@@ -2196,12 +2196,12 @@
                 document.getElementById('coin-val').innerText = this.coinsGained;
                 document.getElementById('high-score-val').innerText = userData.highScore;
                 document.getElementById('total-coins-val').innerText = userData.coins;
-                document.getElementById('board-count').innerText = userData.hoverboards;
+                document.getElementById('board-count').innerText = userData.Shields;
 
                 const pContainer = document.getElementById('powerup-container');
                 pContainer.innerHTML = '';
                 for(let k in this.activePowerups) {
-                    if (this.activePowerups[k] > 0 && k !== 'hoverboard') {
+                    if (this.activePowerups[k] > 0 && k !== 'Shield') {
                         const pct = Math.max(0, (this.activePowerups[k] / 12) * 100);
                         const bar = document.createElement('div');
                         bar.className = 'powerup-bar';
@@ -2219,7 +2219,7 @@
                 const itemsList = document.getElementById('shop-items-list');
                 itemsList.innerHTML = '';
                 const shopData = [
-                    { id: 'hoverboard', name: 'Hoverboard Shield', cost: 100 },
+                    { id: 'Shield', name: 'Shield Shield', cost: 100 },
                     { id: 'magnet', name: 'Magnet Duration', cost: 150 },
                     { id: 'jetpack', name: 'Jetpack Duration', cost: 200 }
                 ];
@@ -2233,7 +2233,7 @@
                     row.querySelector('.buy-btn').addEventListener('click', () => {
                         if (userData.coins >= item.cost) {
                             userData.coins -= item.cost;
-                            if (item.id === 'hoverboard') userData.hoverboards++;
+                            if (item.id === 'Shield') userData.Shields++;
                             SaveSystem.save(userData);
                             this.showShop();
                             this.updateUI();
