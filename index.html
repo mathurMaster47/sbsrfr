@@ -1101,21 +1101,33 @@
                     laneSet.forEach((laneIdx) => {
                         const laneX = CONFIG.LANES[laneIdx];
                         const isRamp = (laneIdx === rampLaneIdx) || Math.random() < 0.12;
-                        const isMoving = Math.random() < 0.12;
+                        // Reduced moving train spawn rate from 12% to 5% to prevent collisions
+                        const isMoving = Math.random() < 0.05;
 
                         // Check if this position would overlap with existing trains
                         const wouldOverlap = this.activeObstacles.some(obs => {
                             if (obs.userData.type === 'train' || obs.userData.type === 'moving_train') {
                                 const zDist = Math.abs(obs.position.z - spZ);
                                 const xDist = Math.abs(obs.position.x - laneX);
-                                // Trains overlap if they're too close in Z and in same lane
-                                return zDist < 16 && xDist < 1.0;
+                                // Increased overlap threshold from 16 to 20 for more safety margin
+                                return zDist < 20 && xDist < 1.0;
                             }
                             return false;
                         });
 
-                        // Only spawn train if no overlap detected
-                        if (!wouldOverlap) {
+                        // Additional check: prevent moving trains in lanes with any existing trains
+                        const laneHasTrains = this.activeObstacles.some(obs => {
+                            if (obs.userData.type === 'train' || obs.userData.type === 'moving_train') {
+                                const xDist = Math.abs(obs.position.x - laneX);
+                                const zDist = Math.abs(obs.position.z - spZ);
+                                // Check if there are trains in this lane within reasonable distance
+                                return xDist < 1.0 && zDist < 50;
+                            }
+                            return false;
+                        });
+
+                        // Only spawn train if no overlap detected and moving trains don't share lanes
+                        if (!wouldOverlap && (!isMoving || !laneHasTrains)) {
                             this.createTrain(laneX, spZ, isRamp, isMoving);
                         }
                     });
@@ -1616,7 +1628,27 @@
                     let isRampClimbing = false;
                     
                     if (obs.userData.type === 'moving_train') {
-                        obs.position.z += this.speed + obs.userData.speed;
+                        // Check for train-to-train collision and prevent overlap
+                        let wouldCollide = false;
+                        for (let j = this.activeObstacles.length - 1; j >= 0; j--) {
+                            if (i === j) continue;
+                            const other = this.activeObstacles[j];
+                            if (other.userData.type === 'train' || other.userData.type === 'moving_train') {
+                                const zDist = Math.abs(obs.position.z - other.position.z);
+                                const xDist = Math.abs(obs.position.x - other.position.x);
+                                // If trains are too close in same lane, stop the moving train
+                                if (zDist < 15 && xDist < 1.0) {
+                                    wouldCollide = true;
+                                    break;
+                                }
+                            }
+                        }
+                        // Only move if no collision would occur
+                        if (!wouldCollide) {
+                            obs.position.z += this.speed + obs.userData.speed;
+                        } else {
+                            obs.position.z += this.speed; // Move at normal speed to avoid collision
+                        }
                     } else {
                         obs.position.z += this.speed;
                     }
