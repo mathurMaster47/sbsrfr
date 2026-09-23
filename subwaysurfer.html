@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Subway Surfer 3D - Ultimate Trains Edition</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: radial-gradient(circle at top, #7dd3fc 0%, #4ab3f4 42%, #0f4c81 100%);
+            font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0));
+            pointer-events: none;
+            z-index: 0;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* HUD & UI LAYERS */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px;
+            z-index: 10;
+        }
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+        .hud-left, .hud-right {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .hud-card {
+            background: rgba(10, 10, 25, 0.75);
+            padding: 8px 16px;
+            border-radius: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            font-weight: 800;
+            font-size: 20px;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .hud-card.score { color: #00f0ff; text-shadow: 0 0 10px rgba(0, 240, 255, 0.6); }
+        .hud-card.coins { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.6); }
+        .hud-card.fps { color: #2ed573; font-size: 14px; padding: 4px 10px; }
+        .hud-card.multiplier { color: #ff0055; font-size: 16px; padding: 6px 12px; }
+
+        /* POWER-UP TIMERS */
+        #powerup-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .powerup-bar {
+            width: 170px;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 8px;
+            padding: 5px 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(4px);
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .powerup-info { display: flex; justify-content: space-between; }
+        .powerup-progress-bg {
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .powerup-progress-fill {
+            height: 100%;
+            width: 100%;
+            background: #2ed573;
+            border-radius: 3px;
+            transition: width 0.1s linear;
+        }
+
+        /* BOTTOM HUD */
+        .hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+        }
+        .hoverboard-status {
+            background: rgba(255, 0, 85, 0.3);
+            border: 2px solid #ff0055;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-weight: 800;
+            font-size: 13px;
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .top-btns {
+            pointer-events: auto;
+            display: flex;
+            gap: 8px;
+        }
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s;
+        }
+        .icon-btn:hover { transform: scale(1.1); }
+
+        /* OVERLAYS & MODALS */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 20, 35, 0.88);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            pointer-events: auto;
+            backdrop-filter: blur(12px);
+            z-index: 20;
+        }
+        .hidden { display: none !important; }
+
+        h1.title {
+            font-size: 52px;
+            font-weight: 900;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #ff4757, #ffa500, #2ed573);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            filter: drop-shadow(0 0 15px rgba(255, 71, 87, 0.5));
+        }
+        p.subtitle {
+            font-size: 15px;
+            margin-bottom: 20px;
+            color: #d0e0f0;
+            text-align: center;
+            max-width: 460px;
+        }
+
+        .selector-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .selector-box {
+            display: flex;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .select-opt {
+            padding: 8px 16px;
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #ddd;
+            transition: 0.2s;
+        }
+        .select-opt.active {
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.5);
+        }
+
+        .btn-group { display: flex; gap: 14px; }
+        .btn {
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            color: white;
+            border: none;
+            padding: 14px 38px;
+            font-size: 18px;
+            font-weight: 900;
+            border-radius: 35px;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(255, 71, 87, 0.5);
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #2ed573, #10ac84);
+            color: white;
+            box-shadow: 0 8px 25px rgba(46, 213, 115, 0.4);
+        }
+        .btn:hover { transform: translateY(-3px) scale(1.03); }
+
+        .stats-summary {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 15px 0;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .stat-row { display: flex; justify-content: space-between; font-size: 18px; margin: 6px 0; }
+        .stat-val { font-weight: bold; color: #ffd700; }
+
+        /* SHOP */
+        .shop-box {
+            background: rgba(15, 25, 40, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            padding: 24px;
+            width: 90%;
+            max-width: 550px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+        .shop-items { display: flex; flex-direction: column; gap: 12px; }
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 12px 16px;
+            border-radius: 12px;
+        }
+        .buy-btn {
+            background: #ffd700;
+            color: #000;
+            font-weight: 800;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 16px;
+            cursor: pointer;
+        }
+        .buy-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+    </style>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GLTFLoader CDN for imported 3D models -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <!-- HUD LAYER -->
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div class="hud-left">
+                    <div class="hud-card score">⚡ <span id="score-val">0</span></div>
+                    <div class="hud-card coins">🪙 <span id="coin-val">0</span></div>
+                    <div id="powerup-container"></div>
+                </div>
+
+                <div class="hud-right">
+                    <div class="top-btns">
+                        <div class="hud-card fps" id="fps-val">60 FPS</div>
+                        <button class="icon-btn" id="sound-btn" title="Toggle Sound">🔊</button>
+                        <button class="icon-btn" id="pause-btn" title="Pause Game">⏸️</button>
+                    </div>
+                    <div class="hud-card multiplier">MULT <span id="mult-val">x1</span></div>
+                </div>
+            </div>
+
+            <div class="hud-bottom">
+                <div class="hoverboard-status" id="board-indicator">
+                    🛹 HOVERBOARD: <span id="board-count">0</span> (Press SPACE / Double Tap)
+                </div>
+                <div style="color: rgba(255,255,255,0.9); font-size: 12px; font-weight: bold;">
+                    WASD / Arrows to Move | Space for Board
+                </div>
+            </div>
+        </div>
+
+        <!-- START SCREEN -->
+        <div id="start-screen" class="modal-overlay">
+            <h1 class="title">Subway Surfers 3D</h1>
+            <p class="subtitle">MAX TRAINS EDITION! Bigger 3D Characters & Non-Stop Train Action!</p>
+
+            <div class="selector-row">
+                <div class="selector-box">
+                    <button class="select-opt char-opt active" data-char="boy">🧢 BOY</button>
+                </div>
+
+                <div class="selector-box">
+                    <button class="select-opt speed-opt" data-speed="normal">NORMAL</button>
+                    <button class="select-opt speed-opt active" data-speed="turbo">🚀 TURBO</button>
+                    <button class="select-opt speed-opt" data-speed="insane">⚡ INSANE</button>
+                </div>
+            </div>
+
+            <div class="stats-summary" style="min-width: 280px;">
+                <div class="stat-row">
+                    <span>HIGH SCORE:</span>
+                    <span class="stat-val" id="high-score-val">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>TOTAL COINS:</span>
+                    <span class="stat-val" style="color: #ffd700;" id="total-coins-val">0</span>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn" id="start-btn">▶ RUN NOW</button>
+                <button class="btn btn-secondary" id="shop-btn">🛒 SHOP</button>
+            </div>
+        </div>
+
+        <!-- PAUSE SCREEN -->
+        <div id="pause-screen" class="modal-overlay hidden">
+            <h1 class="title" style="background: linear-gradient(45deg, #ff4757, #ffa500); -webkit-background-clip: text;">PAUSED</h1>
+            <div class="btn-group">
+                <button class="btn" id="resume-btn">RESUME</button>
+                <button class="btn btn-secondary" id="quit-btn">QUIT</button>
+            </div>
+        </div>
+
+        <!-- GAME OVER SCREEN -->
+        <div id="game-over-screen" class="modal-overlay hidden">
+            <h1 class="title">CRASHED!</h1>
+            <p class="subtitle" id="game-over-msg">Slammed into train!</p>
+
+            <div class="stats-summary" style="min-width: 300px;">
+                <div class="stat-row">
+                    <span>FINAL SCORE:</span>
+                    <span class="stat-val" id="final-score">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>COINS GAINED:</span>
+                    <span class="stat-val" style="color: #ffd700;" id="final-coins">0</span>
+                </div>
+                <div class="stat-row" id="new-record-row" style="display: none;">
+                    <span style="color: #2ed573; font-weight: 900;">NEW HIGH RECORD! 🎉</span>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn" id="restart-btn">🔄 TRY AGAIN</button>
+                <button class="btn btn-secondary" id="menu-btn">🏠 MAIN MENU</button>
+            </div>
+        </div>
+
+        <!-- SHOP MODAL -->
+        <div id="shop-screen" class="modal-overlay hidden">
+            <div class="shop-box">
+                <div class="shop-header">
+                    <h2 style="color: #ff4757;">SURFER SHOP</h2>
+                    <div class="hud-card coins" style="padding: 4px 12px; font-size: 15px;">
+                        🪙 <span id="shop-coin-val">0</span>
+                    </div>
+                </div>
+                <div class="shop-items" id="shop-items-list"></div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn btn-secondary" id="close-shop-btn">CLOSE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* --- CONFIGURATION & PRESETS --- */
+        const SPEED_PRESETS = {
+            normal: { initial: 0.36, max: 0.82, accel: 0.00004 },
+            turbo:  { initial: 0.52, max: 1.20, accel: 0.00008 },
+            insane: { initial: 0.78, max: 1.75, accel: 0.00015 }
+        };
+
+        let selectedSpeedMode = 'turbo';
+        let selectedCharacter = 'boy';
+
+        const CONFIG = {
+            LANE_WIDTH: 2.8,
+            LANES: [-2.8, 0, 2.8],
+            JUMP_FORCE: 0.28,
+            GRAVITY: 0.024,
+            SEGMENT_LENGTH: 50,
+            VISIBLE_SEGMENTS: 6,
+            TRAIN_SPEED: 0.35
+        };
+
+        function checkAABB(px, py, pz, pw, ph, pd, ox, oy, oz, ow, oh, od) {
+            return (Math.abs(px - ox) * 2 < (pw + ow)) &&
+                   (Math.abs(py - oy) * 2 < (ph + oh)) &&
+                   (Math.abs(pz - oz) * 2 < (pd + od));
+        }
+
+        /* --- AUDIO SYNTHESIZER --- */
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+
+            playTone(freq, type, duration, vol = 0.1) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
+            }
+
+            playCoin() {
+                this.init();
+                this.playTone(1046.50, 'sine', 0.08, 0.12);
+            }
+
+            playJump() {
+                this.init();
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(420, this.ctx.currentTime + 0.14);
+                    gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.14);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.14);
+                } catch(e) {}
+            }
+
+            playSlide() {
+                this.init();
+                this.playTone(140, 'triangle', 0.12, 0.15);
+            }
+
+            playPowerup() {
+                this.init();
+                [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => {
+                    setTimeout(() => this.playTone(f, 'sine', 0.15, 0.15), i * 50);
+                });
+            }
+
+            playCrash() {
+                this.init();
+                this.playTone(80, 'sawtooth', 0.35, 0.3);
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        /* --- PROCEDURAL TEXTURES --- */
+        class TextureGenerator {
+            static createRedTrainTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ff4757'; ctx.fillRect(0, 0, 256, 256);
+                ctx.fillStyle = '#ffa500'; ctx.fillRect(0, 90, 256, 40);
+                ctx.fillStyle = '#1e272e'; for(let x = 20; x < 240; x += 60) ctx.fillRect(x, 30, 40, 35);
+                const tex = new THREE.CanvasTexture(canvas); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; return tex;
+            }
+
+            static createBlueMetroTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#1e90ff'; ctx.fillRect(0, 0, 256, 256);
+                ctx.fillStyle = '#70a1ff'; ctx.fillRect(0, 100, 256, 30);
+                ctx.fillStyle = '#1e272e'; for(let x = 20; x < 240; x += 60) ctx.fillRect(x, 30, 40, 35);
+                const tex = new THREE.CanvasTexture(canvas); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; return tex;
+            }
+
+            static createBrickWallTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#b0422e'; ctx.fillRect(0, 0, 512, 512);
+                ctx.strokeStyle = '#8f3222'; ctx.lineWidth = 4;
+                for(let y = 0; y < 512; y += 32) {
+                    const offset = (y / 32 % 2) * 32;
+                    for(let x = -64; x < 512 + 64; x += 64) {
+                        ctx.strokeRect(x + offset, y, 64, 32);
+                    }
+                }
+                ctx.fillStyle = '#e1b12c'; ctx.fillRect(0, 470, 512, 42);
+                ctx.fillStyle = '#1e272e';
+                for(let x = -512; x < 1024; x += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 470); ctx.lineTo(x + 30, 512);
+                    ctx.lineTo(x + 50, 512); ctx.lineTo(x + 20, 470);
+                    ctx.fill();
+                }
+                ctx.font = 'bold 50px sans-serif'; ctx.fillStyle = '#2ed573';
+                ctx.fillText('SUBWAY SURF', 80, 200);
+                const tex = new THREE.CanvasTexture(canvas); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; return tex;
+            }
+
+            static createTrackGravelTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#3a3a40'; ctx.fillRect(0, 0, 256, 256);
+                for(let y = 0; y < 256; y += 32) {
+                    ctx.fillStyle = '#4a2e1b'; ctx.fillRect(0, y, 256, 16);
+                }
+                const tex = new THREE.CanvasTexture(canvas); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 8); return tex;
+            }
+
+            static createRampTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#e67e22'; ctx.fillRect(0, 0, 256, 256);
+                ctx.fillStyle = '#f1c40f';
+                for(let y = -256; y < 512; y += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y); ctx.lineTo(256, y + 120);
+                    ctx.lineTo(256, y + 150); ctx.lineTo(0, y + 30);
+                    ctx.fill();
+                }
+                const tex = new THREE.CanvasTexture(canvas); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; return tex;
+            }
+
+            static createCoinTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128; canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(64, 64, 60, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#b8860b'; ctx.font = 'bold 60px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('★', 64, 85);
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            static createLondonStationTexture(stationName) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                
+                // Classic white tube tile pattern
+                ctx.fillStyle = '#f5f6fa'; ctx.fillRect(0, 0, 512, 512);
+                ctx.strokeStyle = '#dcdde1'; ctx.lineWidth = 2;
+                for(let y = 0; y < 512; y += 24) {
+                    const offset = (y / 24 % 2) * 24;
+                    for(let x = -48; x < 512 + 48; x += 48) {
+                        ctx.strokeRect(x + offset, y, 48, 24);
+                    }
+                }
+                
+                // Deep Red London Underground accent borders
+                ctx.fillStyle = '#c0392b'; ctx.fillRect(0, 80, 512, 24);
+                ctx.fillRect(0, 390, 512, 24);
+                
+                // Iconic Roundel: Red Ring + Blue Nameplate
+                const centerX = 256; const centerY = 240;
+                ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 34;
+                ctx.beginPath(); ctx.arc(centerX, centerY, 95, 0, Math.PI * 2); ctx.stroke();
+                
+                ctx.fillStyle = '#002f6c'; ctx.fillRect(centerX - 180, centerY - 28, 360, 56);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '900 22px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(stationName, centerX, centerY);
+                
+                // MIND THE GAP Yellow Hazard Platform Edge
+                ctx.fillStyle = '#f1c40f'; ctx.fillRect(0, 465, 512, 47);
+                ctx.fillStyle = '#000000'; ctx.font = 'bold 22px sans-serif';
+                ctx.fillText('⚠️  MIND THE GAP  ⚠️', 256, 490);
+                
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            }
+
+            static createTunnelWallTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                
+                // Dark concrete brick tunnel wall background
+                ctx.fillStyle = '#1e1e24'; ctx.fillRect(0, 0, 512, 512);
+                ctx.strokeStyle = '#2d2d38'; ctx.lineWidth = 3;
+                for(let y = 0; y < 512; y += 32) {
+                    const offset = (y / 32 % 2) * 32;
+                    for(let x = -64; x < 512 + 64; x += 64) {
+                        ctx.strokeRect(x + offset, y, 64, 32);
+                    }
+                }
+                
+                // Yellow/Black Danger hazard stripes along base
+                ctx.fillStyle = '#f1c40f'; ctx.fillRect(0, 460, 512, 52);
+                ctx.fillStyle = '#000000';
+                for(let x = -512; x < 1024; x += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 460); ctx.lineTo(x + 25, 512);
+                    ctx.lineTo(x + 45, 512); ctx.lineTo(x + 20, 460);
+                    ctx.fill();
+                }
+                
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            }
+        }
+
+        const LONDON_STATIONS = [
+            "KING'S CROSS ST. PANCRAS",
+            "PADDINGTON",
+            "WATERLOO",
+            "VICTORIA",
+            "BAKER STREET",
+            "OXFORD CIRCUS"
+        ];
+
+        /* --- DATA PERSISTENCE --- */
+        class SaveSystem {
+            static load() {
+                const def = { highScore: 0, coins: 0, hoverboards: 5 };
+                try {
+                    const s = localStorage.getItem('subway_surfer_data');
+                    return s ? Object.assign(def, JSON.parse(s)) : def;
+                } catch(e) { return def; }
+            }
+            static save(data) {
+                try { localStorage.setItem('subway_surfer_data', JSON.stringify(data)); } catch(e) {}
+            }
+        }
+
+        let userData = SaveSystem.load();
+
+        /* --- GAME ENGINE --- */
+        class GameEngine {
+            constructor() {
+                this.container = document.getElementById('game-container');
+                this.active = false;
+                this.paused = false;
+
+                this.fps = 60;
+                this.frameCount = 0;
+                this.lastFpsTime = performance.now();
+
+                this.score = 0;
+                this.coinsGained = 0;
+                this.currentLane = 1;
+                this.targetX = 0;
+
+                this.posX = 0;
+                this.posY = 0;
+                this.posZ = 0;
+                this.velY = 0;
+                this.isJumping = false;
+                this.isSliding = false;
+                this.slideTimer = 0;
+                this.isOnTrain = false;
+                this.isClimbingRamp = false;
+                this.currentTrainY = 0;
+
+                this.mixer = null;
+                this.runAction = null;
+
+                this.gltfModels = {
+                    shoe: null,
+                    train: null,
+                    tree: null
+                };
+
+                this.activePowerups = { magnet: 0, jetpack: 0, sneakers: 0, multiplier: 0, hoverboard: 0 };
+
+                this.activeSegments = [];
+                this.activeObstacles = [];
+                this.activeCoins = [];
+                this.activePowerupItems = [];
+                this.touchStartX = 0;
+                this.touchStartY = 0;
+                this.lastTapTime = 0;
+
+                this.initWebGL();
+                this.initGeometriesAndMaterials();
+                this.loadImportedGLTFAssets();
+                this.createPlayerModel();
+                this.bindEvents();
+                this.updateUI();
+
+                this.lastFrameTime = performance.now();
+                requestAnimationFrame(this.render.bind(this));
+            }
+
+            initWebGL() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x4ab3f4);
+                this.scene.fog = new THREE.FogExp2(0x4ab3f4, 0.007);
+
+                this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 240);
+                this.camera.position.set(0, 12.5, 14.0);
+                this.camera.lookAt(0, 1.8, -18.0);
+
+                const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+                this.renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    powerPreference: "high-performance",
+                    stencil: false,
+                    precision: "mediump"
+                });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(pixelRatio);
+                this.renderer.outputEncoding = THREE.sRGBEncoding;
+                this.renderer.shadowMap.enabled = false;
+                this.renderer.shadowMap.type = THREE.BasicShadowMap;
+                this.container.appendChild(this.renderer.domElement);
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+                this.scene.add(ambientLight);
+
+                const sunLight = new THREE.DirectionalLight(0xfffaed, 1.2);
+                sunLight.position.set(25, 45, 20);
+                sunLight.castShadow = true;
+                this.scene.add(sunLight);
+
+                const hemiLight = new THREE.HemisphereLight(0x4ab3f4, 0xb0422e, 0.5);
+                this.scene.add(hemiLight);
+            }
+
+            initGeometriesAndMaterials() {
+                const texLoader = new THREE.TextureLoader();
+                const woodTex = texLoader.load('assets/textures/wood.jpg');
+                woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
+
+                this.geos = {
+                    coin: new THREE.CylinderGeometry(0.35, 0.35, 0.08, 16),
+                    track: new THREE.BoxGeometry(CONFIG.LANE_WIDTH * 3 + 2, 0.2, CONFIG.SEGMENT_LENGTH),
+                    wall: new THREE.BoxGeometry(1.5, 8, CONFIG.SEGMENT_LENGTH),
+                    rail: new THREE.BoxGeometry(0.12, 0.12, CONFIG.SEGMENT_LENGTH),
+                    train: new THREE.BoxGeometry(2.4, 3.2, 14),
+                    ramp: new THREE.BoxGeometry(2.3, 0.2, 5.2),
+                    hurdleBar: new THREE.BoxGeometry(2.4, 0.35, 0.2),
+                    barrierTop: new THREE.BoxGeometry(2.4, 1.4, 0.2),
+                    gantryTop: new THREE.BoxGeometry(CONFIG.LANE_WIDTH * 3 + 4, 1.2, 0.4),
+                    gantryPillar: new THREE.CylinderGeometry(0.2, 0.2, 5, 8),
+                    cone: new THREE.ConeGeometry(0.3, 0.8, 8),
+                    barrel: new THREE.CylinderGeometry(0.4, 0.4, 1.0, 12),
+                    powerup: new THREE.BoxGeometry(0.6, 0.6, 0.6),
+                    catenaryArch: new THREE.BoxGeometry(CONFIG.LANE_WIDTH * 3 + 4, 0.3, 0.3),
+                    treeTrunk: new THREE.CylinderGeometry(0.3, 0.4, 3, 6),
+                    treeLeaves: new THREE.ConeGeometry(2.2, 5, 6)
+                };
+
+                this.mats = {
+                    trainRed: new THREE.MeshStandardMaterial({ map: TextureGenerator.createRedTrainTexture(), roughness: 0.3 }),
+                    trainBlue: new THREE.MeshStandardMaterial({ map: TextureGenerator.createBlueMetroTexture(), roughness: 0.3 }),
+                    ramp: new THREE.MeshStandardMaterial({ map: TextureGenerator.createRampTexture(), roughness: 0.4 }),
+                    track: new THREE.MeshStandardMaterial({ map: TextureGenerator.createTrackGravelTexture(), roughness: 0.8 }),
+                    wall: new THREE.MeshStandardMaterial({ map: TextureGenerator.createBrickWallTexture(), roughness: 0.7 }),
+                    coin: new THREE.MeshStandardMaterial({ map: TextureGenerator.createCoinTexture(), metalness: 0.8, roughness: 0.2 }),
+                    hurdle: new THREE.MeshStandardMaterial({ color: 0xff4757, roughness: 0.3 }),
+                    barrier: new THREE.MeshStandardMaterial({ color: 0x1e90ff, roughness: 0.3 }),
+                    gantry: new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.4 }),
+                    cone: new THREE.MeshStandardMaterial({ color: 0xff6b81, roughness: 0.3 }),
+                    barrel: new THREE.MeshStandardMaterial({ color: 0x2ed573, roughness: 0.5 }),
+                    rail: new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9 }),
+                    treeTrunk: new THREE.MeshStandardMaterial({ color: 0x5d4037 }),
+                    treeLeaves: new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 0.6 }),
+                    tunnelWall: new THREE.MeshStandardMaterial({ map: TextureGenerator.createTunnelWallTexture(), roughness: 0.8 })
+                };
+
+                this.stationMats = {};
+                LONDON_STATIONS.forEach(name => {
+                    this.stationMats[name] = new THREE.MeshStandardMaterial({
+                        map: TextureGenerator.createLondonStationTexture(name),
+                        roughness: 0.5
+                    });
+                });
+            }
+
+            loadImportedGLTFAssets() {
+                if (!window.THREE.GLTFLoader) return;
+                const loader = new THREE.GLTFLoader();
+
+                loader.load('assets/Shoe.glb', (gltf) => {
+                    const model = gltf.scene;
+                    model.scale.set(0.6, 0.6, 0.6);
+                    this.gltfModels.shoe = model;
+                }, undefined, () => {});
+
+                loader.load('assets/Tree.glb', (gltf) => {
+                    const model = gltf.scene;
+                    model.scale.set(1.5, 1.5, 1.5);
+                    this.gltfModels.tree = model;
+                }, undefined, () => {});
+            }
+
+            /* --- BIGGER CHARACTER MODELING & FORWARD ORIENTATION (FACING AWAY DOWN TRACK) --- */
+            createPlayerModel() {
+                this.playerGroup = new THREE.Group();
+                this.playerRig = new THREE.Group();
+                this.playerGroup.add(this.playerRig);
+
+                const jacketMat = new THREE.MeshStandardMaterial({ color: 0xff4757 });
+                const pantsMat = new THREE.MeshStandardMaterial({ color: 0x2f3542 });
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+
+                this.torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.6), jacketMat);
+                this.torso.position.y = 1.4;
+                this.playerRig.add(this.torso);
+
+                this.head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 12), skinMat);
+                this.head.position.y = 2.2;
+                this.playerRig.add(this.head);
+
+                const shoeMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.7 });
+                const hairMat = new THREE.MeshStandardMaterial({ color: 0x2d1b12, roughness: 0.8 });
+                const limbGeo = new THREE.CylinderGeometry(0.13, 0.16, 0.9, 8);
+                const armLeft = new THREE.Mesh(limbGeo, skinMat);
+                const armRight = armLeft.clone();
+                armLeft.position.set(-0.58, 1.48, 0);
+                armRight.position.set(0.58, 1.48, 0);
+                armLeft.rotation.z = -0.18;
+                armRight.rotation.z = 0.18;
+                this.playerRig.add(armLeft, armRight);
+
+                const legGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.95, 8);
+                const legLeft = new THREE.Mesh(legGeo, pantsMat);
+                const legRight = legLeft.clone();
+                legLeft.position.set(-0.24, 0.55, 0);
+                legRight.position.set(0.24, 0.55, 0);
+                this.playerRig.add(legLeft, legRight);
+
+                const shoeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.58), shoeMat);
+                const shoeRight = shoeLeft.clone();
+                shoeLeft.position.set(-0.24, 0.08, -0.14);
+                shoeRight.position.set(0.24, 0.08, -0.14);
+                this.playerRig.add(shoeLeft, shoeRight);
+
+                const hair = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.42), hairMat);
+                hair.position.set(0, 2.3, 0);
+                this.playerRig.add(hair);
+
+                const boardMeshGroup = new THREE.Group();
+                const boardBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 2.8), new THREE.MeshStandardMaterial({ color: 0xff4757, metalness: 0.8 }));
+                const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.02, 2.82), new THREE.MeshBasicMaterial({ color: 0xffd700 }));
+                boardMeshGroup.add(boardBody); boardMeshGroup.add(stripe);
+                boardMeshGroup.position.set(0, -0.05, 0);
+
+                this.hoverboardMesh = boardMeshGroup;
+                this.hoverboardMesh.visible = false;
+                this.playerGroup.add(this.hoverboardMesh);
+
+                // CLEAN 3D JETPACK MODEL (TWIN ROCKET NOZZLES - NO REVOLVER ARTIFACT)
+                this.jetpackMesh = new THREE.Group();
+                const jpMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9, roughness: 0.2 });
+                const jp1 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.8, 12), jpMat);
+                jp1.position.set(-0.25, 1.4, 0.35);
+                const jp2 = jp1.clone();
+                jp2.position.set(0.25, 1.4, 0.35);
+                const flameGeo = new THREE.ConeGeometry(0.18, 0.6, 8);
+                const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+                const f1 = new THREE.Mesh(flameGeo, flameMat);
+                f1.rotation.x = Math.PI;
+                f1.position.set(-0.25, 0.8, 0.35);
+                const f2 = f1.clone();
+                f2.position.set(0.25, 0.8, 0.35);
+
+                this.jetpackMesh.add(jp1); this.jetpackMesh.add(jp2);
+                this.jetpackMesh.add(f1); this.jetpackMesh.add(f2);
+                this.jetpackMesh.visible = false;
+                this.playerRig.add(this.jetpackMesh);
+
+                this.scene.add(this.playerGroup);
+                this.loadImportedCharacter(selectedCharacter);
+            }
+
+            loadImportedCharacter(charType) {
+                if (!window.THREE.GLTFLoader) return;
+
+                const loader = new THREE.GLTFLoader();
+                loader.load('assets/Soldier.glb', (gltf) => {
+                    const model = gltf.scene;
+                    model.scale.set(2.05, 2.05, 2.05);
+                    model.rotation.y = 0;
+                    model.traverse(child => {
+                        if (child.isMesh) {
+                            child.castShadow = false;
+                            child.receiveShadow = false;
+                        }
+                    });
+
+                    if (gltf.animations && gltf.animations.length > 0) {
+                        this.mixer = new THREE.AnimationMixer(model);
+                        const runClip = THREE.AnimationClip.findByName(gltf.animations, 'Run') ||
+                            THREE.AnimationClip.findByName(gltf.animations, 'Running') ||
+                            gltf.animations[0];
+                        if (runClip) {
+                            this.runAction = this.mixer.clipAction(runClip);
+                            this.runAction.play();
+                        }
+                    }
+
+                    this.playerRig.clear();
+                    this.playerRig.add(model);
+                    this.playerRig.add(this.hoverboardMesh);
+                    this.playerRig.add(this.jetpackMesh);
+                }, undefined, (error) => {
+                    console.warn('Boy asset could not be loaded; using the built-in runner.', error);
+                });
+            }
+
+            createSegment(zPos) {
+                const segment = new THREE.Group();
+
+                this.segmentCount = (this.segmentCount || 0) + 1;
+                const isStationSegment = (this.segmentCount % 6 === 0);
+                const isTunnelSegment = (this.segmentCount % 6 === 2);
+                const isBridgeSegment = (this.segmentCount % 6 === 4);
+                const stationName = LONDON_STATIONS[Math.floor(this.segmentCount / 6) % LONDON_STATIONS.length];
+
+                const trackMesh = new THREE.Mesh(this.geos.track, this.mats.track);
+                trackMesh.position.set(0, -0.1, -CONFIG.SEGMENT_LENGTH / 2);
+                segment.add(trackMesh);
+
+                for(let lane of CONFIG.LANES) {
+                    const r1 = new THREE.Mesh(this.geos.rail, this.mats.rail);
+                    r1.position.set(lane - 0.7, 0.06, -CONFIG.SEGMENT_LENGTH / 2);
+                    const r2 = new THREE.Mesh(this.geos.rail, this.mats.rail);
+                    r2.position.set(lane + 0.7, 0.06, -CONFIG.SEGMENT_LENGTH / 2);
+                    segment.add(r1); segment.add(r2);
+                }
+
+                let wallMat = this.mats.wall;
+                if (isStationSegment) wallMat = this.stationMats[stationName];
+                else if (isTunnelSegment) wallMat = this.mats.tunnelWall;
+
+                const wallHeight = (isTunnelSegment || isStationSegment || isBridgeSegment) ? 18 : 8;
+                const wallGeo = (wallHeight === 18) ? new THREE.BoxGeometry(1.5, 18, CONFIG.SEGMENT_LENGTH) : this.geos.wall;
+
+                const leftWall = new THREE.Mesh(wallGeo, wallMat);
+                leftWall.position.set(-(CONFIG.LANE_WIDTH * 1.8 + 1.5), wallHeight / 2, -CONFIG.SEGMENT_LENGTH / 2);
+                const rightWall = new THREE.Mesh(wallGeo, wallMat);
+                rightWall.position.set((CONFIG.LANE_WIDTH * 1.8 + 1.5), wallHeight / 2, -CONFIG.SEGMENT_LENGTH / 2);
+                segment.add(leftWall); segment.add(rightWall);
+
+                if (isStationSegment) {
+                    // London Tube Station High Canopy Roof & Warm Lights (Height: 16.5)
+                    const canopyRoofMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.6, roughness: 0.4 });
+                    const canopyRoof = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.LANE_WIDTH * 3 + 4, 0.6, CONFIG.SEGMENT_LENGTH), canopyRoofMat);
+                    canopyRoof.position.set(0, 16.5, -CONFIG.SEGMENT_LENGTH / 2);
+                    segment.add(canopyRoof);
+
+                    for (let lz = -10; lz > -CONFIG.SEGMENT_LENGTH; lz -= 15) {
+                        const lampMat = new THREE.MeshBasicMaterial({ color: 0xffeaa7 });
+                        const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 0.6, 8), lampMat);
+                        lamp.position.set(0, 15.6, lz);
+                        segment.add(lamp);
+                    }
+                } else if (isTunnelSegment) {
+                    // Ultra Tall Dark Cavernous Tunnel Ceiling & Tube Lights (Height: 17.5)
+                    const tunnelRoofMat = new THREE.MeshStandardMaterial({ color: 0x151518, roughness: 0.9 });
+                    const tunnelRoof = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.LANE_WIDTH * 3 + 4, 1.5, CONFIG.SEGMENT_LENGTH), tunnelRoofMat);
+                    tunnelRoof.position.set(0, 17.5, -CONFIG.SEGMENT_LENGTH / 2);
+                    segment.add(tunnelRoof);
+
+                    for (let lz = -5; lz > -CONFIG.SEGMENT_LENGTH; lz -= 12) {
+                        const tubeLight = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4.2, 8), new THREE.MeshBasicMaterial({ color: 0x00f0ff }));
+                        tubeLight.rotation.z = Math.PI / 2;
+                        tubeLight.position.set(0, 16.5, lz);
+                        segment.add(tubeLight);
+                    }
+
+                    // Grand Tunnel Portal Entrance Arch Structure
+                    const portalFrameMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, roughness: 0.7 });
+                    const portalBeam = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.LANE_WIDTH * 3 + 4, 3.0, 1.2), portalFrameMat);
+                    portalBeam.position.set(0, 15.0, -4);
+                    segment.add(portalBeam);
+                } else if (isBridgeSegment) {
+                    // Tall Overhead Railway Viaduct Bridge Structure (Height: 16.5)
+                    const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.8, roughness: 0.3 });
+                    const topGirder = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.LANE_WIDTH * 3 + 4, 1.2, 6), bridgeMat);
+                    topGirder.position.set(0, 16.5, -CONFIG.SEGMENT_LENGTH / 2);
+                    segment.add(topGirder);
+
+                    [-1.4, 1.4].forEach(px => {
+                        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 16.5, 8), bridgeMat);
+                        pillar.position.set(px, 8.25, -CONFIG.SEGMENT_LENGTH / 2);
+                        segment.add(pillar);
+                    });
+                } else {
+                    const catArch = new THREE.Mesh(this.geos.catenaryArch, new THREE.MeshStandardMaterial({ color: 0x555566 }));
+                    catArch.position.set(0, 9.5, -CONFIG.SEGMENT_LENGTH / 2);
+                    segment.add(catArch);
+
+                    for (let z = -5; z > -CONFIG.SEGMENT_LENGTH; z -= 15) {
+                        if (this.gltfModels.tree) {
+                            const treeL = this.gltfModels.tree.clone();
+                            treeL.position.set(-7.5, 4.0, z);
+                            const treeR = this.gltfModels.tree.clone();
+                            treeR.position.set(7.5, 4.0, z);
+                            segment.add(treeL); segment.add(treeR);
+                        }
+                    }
+                }
+
+                segment.position.z = zPos;
+                this.scene.add(segment);
+                this.activeSegments.push(segment);
+
+                if (zPos < -30) this.spawnSegmentContent(zPos, isTunnelSegment);
+            }
+
+            /* --- MAXIMUM TRAIN DENSITY & TUNNEL PORTAL SQUEEZES --- */
+            spawnSegmentContent(zPos, isTunnelSegment = false) {
+                const safeLane = Math.floor(Math.random() * 3);
+                if (isTunnelSegment) {
+                    const blockedLanes = [0, 1, 2].filter(lane => lane !== safeLane);
+
+                    blockedLanes.forEach(blockedLane => {
+                        this.createTunnelWall(CONFIG.LANES[blockedLane], zPos - 5);
+                    });
+                }
+
+                const zOffsets = isTunnelSegment ? [zPos - 24, zPos - 42] : [zPos - 12, zPos - 30];
+                zOffsets.forEach((spZ) => {
+                    // Reserve the same lane for the entire segment so adjacent waves
+                    // cannot combine into a three-lane dead end.
+                    const laneSet = [0, 1, 2].filter(lane => lane !== safeLane);
+                    const rampLaneIdx = laneSet[Math.floor(Math.random() * laneSet.length)];
+
+                    laneSet.forEach((laneIdx) => {
+                        const laneX = CONFIG.LANES[laneIdx];
+                        const isRamp = (laneIdx === rampLaneIdx) || Math.random() < 0.12;
+                        const isMoving = Math.random() < 0.12;
+
+                        this.createTrain(laneX, spZ, isRamp, isMoving);
+                    });
+                });
+
+                if (Math.random() < 0.32) {
+                    const pLane = CONFIG.LANES[Math.floor(Math.random() * 3)];
+                    this.createPowerupItem(pLane, zPos - 20);
+                }
+
+                const coinLane = CONFIG.LANES[Math.floor(Math.random() * 3)];
+                for (let c = 0; c < 5; c++) {
+                    const coinY = (this.activePowerups.jetpack > 0) ? 5.8 : (c % 2 === 0 ? 4.2 : 0.9);
+                    this.createCoin(coinLane, coinY, zPos - (c * 3.2));
+                }
+            }
+
+            createTunnelWall(x, z) {
+                const group = new THREE.Group();
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0xd63031, roughness: 0.4 });
+                const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 5.0, 1.2), wallMat);
+                wallMesh.position.set(0, 2.5, 0);
+
+                const signMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const sign = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 0.1), signMat);
+                sign.position.set(0, 3.2, 0.65);
+                
+                const bannerMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+                const banner = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 0.12), bannerMat);
+                banner.position.set(0, 1.5, 0.65);
+
+                group.add(wallMesh); group.add(sign); group.add(banner);
+
+                group.position.set(x, 0, z);
+                group.userData = { type: 'tunnel_wall', x: x, y: 0, z: z, w: 2.6, h: 5.0, d: 1.2 };
+                this.scene.add(group);
+                this.activeObstacles.push(group);
+            }
+
+            createTrain(x, z, hasRamp = true, isMoving = false) {
+                const group = new THREE.Group();
+                const trainTypes = [this.mats.trainRed, this.mats.trainBlue];
+                const selectedMat = trainTypes[Math.floor(Math.random() * trainTypes.length)];
+
+                const trainBody = new THREE.Mesh(new THREE.BoxGeometry(2.45, 2.55, 12.5), selectedMat);
+                trainBody.position.y = 1.6;
+                group.add(trainBody);
+
+                const roof = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.3, 0.22, 12.2),
+                    new THREE.MeshStandardMaterial({ color: 0x263238, metalness: 0.7, roughness: 0.25 })
+                );
+                roof.position.y = 2.92;
+                group.add(roof);
+
+                const windowMat = new THREE.MeshStandardMaterial({
+                    color: 0x102a43,
+                    emissive: 0x071827,
+                    emissiveIntensity: 0.35,
+                    metalness: 0.5,
+                    roughness: 0.2
+                });
+                for (let zWindow = -4.5; zWindow <= 4.5; zWindow += 2.25) {
+                    [-1.24, 1.24].forEach(xWindow => {
+                        const window = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.72, 1.35), windowMat);
+                        window.position.set(xWindow, 2.0, zWindow);
+                        group.add(window);
+                    });
+                }
+
+                const front = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.35, 1.45, 0.2),
+                    new THREE.MeshStandardMaterial({ color: 0x37474f, metalness: 0.65, roughness: 0.3 })
+                );
+                front.position.set(0, 1.45, 6.3);
+                group.add(front);
+
+                const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfff3b0 });
+                [-0.72, 0.72].forEach(xLight => {
+                    const headlight = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.08, 12), headlightMat);
+                    headlight.rotation.x = Math.PI / 2;
+                    headlight.position.set(xLight, 1.3, 6.43);
+                    group.add(headlight);
+                });
+
+                const wheelMat = new THREE.MeshStandardMaterial({ color: 0x151515, metalness: 0.7, roughness: 0.35 });
+                [-0.92, 0.92].forEach(xWheel => {
+                    [-4.2, 0, 4.2].forEach(zWheel => {
+                        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.16, 12), wheelMat);
+                        wheel.rotation.z = Math.PI / 2;
+                        wheel.position.set(xWheel, 0.42, zWheel);
+                        group.add(wheel);
+                    });
+                });
+
+                if (hasRamp) {
+                    const ramp = new THREE.Mesh(this.geos.ramp, this.mats.ramp);
+                    ramp.rotation.x = Math.PI / 6.5;
+                    ramp.position.set(0, 0.85, 9.0);
+                    group.add(ramp);
+                } else {
+                    const bumperMat = new THREE.MeshStandardMaterial({ color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 0.3 });
+                    const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, 0.4), bumperMat);
+                    bumper.position.set(0, 0.4, 7.1);
+                    group.add(bumper);
+                }
+
+                group.position.set(x, 0, z);
+                group.userData = {
+                    type: isMoving ? 'moving_train' : 'train',
+                    x: x, y: 0, z: z, w: 2.4, h: 3.2, d: 14, height: 3.2,
+                    hasRamp: hasRamp,
+                    speed: isMoving ? CONFIG.TRAIN_SPEED : 0
+                };
+                this.scene.add(group);
+                this.activeObstacles.push(group);
+            }
+
+            createCones(x, z) {
+                const group = new THREE.Group();
+                for (let i = -0.8; i <= 0.8; i += 0.8) {
+                    const cone = new THREE.Mesh(this.geos.cone, this.mats.cone);
+                    cone.position.set(i, 0.4, 0);
+                    group.add(cone);
+                }
+                group.position.set(x, 0, z);
+                group.userData = { type: 'cones', x: x, y: 0, z: z, w: 2.2, h: 0.8, d: 0.6 };
+                this.scene.add(group);
+                this.activeObstacles.push(group);
+            }
+
+            createHurdle(x, z) {
+                const group = new THREE.Group();
+                const bar = new THREE.Mesh(this.geos.hurdleBar, this.mats.hurdle);
+                bar.position.set(0, 0.7, 0);
+                group.add(bar);
+
+                group.position.set(x, 0, z);
+                group.userData = { type: 'hurdle', x: x, y: 0, z: z, w: 2.4, h: 0.9, d: 0.5 };
+                this.scene.add(group);
+                this.activeObstacles.push(group);
+            }
+
+            createCoin(x, y, z) {
+                const coin = new THREE.Mesh(this.geos.coin, this.mats.coin);
+                coin.rotation.x = Math.PI / 2;
+                coin.position.set(x, y, z);
+                coin.userData = { x: x, y: y, z: z };
+                this.scene.add(coin);
+                this.activeCoins.push(coin);
+            }
+
+            /* --- CLEAN POWERUP CREATION (NO WEIRd REVOLVER SHAPES) --- */
+            createPowerupItem(x, z) {
+                const types = ['magnet', 'jetpack', 'sneakers', 'multiplier'];
+                const pType = types[Math.floor(Math.random() * types.length)];
+                let itemMesh;
+
+                if (pType === 'sneakers' && this.gltfModels.shoe) {
+                    itemMesh = this.gltfModels.shoe.clone();
+                    itemMesh.position.set(x, 1.0, z);
+                } else if (pType === 'jetpack') {
+                    // CLEAN TWIN ROCKET JETPACK POWERUP
+                    const jpGroup = new THREE.Group();
+                    const mat = new THREE.MeshStandardMaterial({ color: 0xffa500, metalness: 0.8 });
+                    const j1 = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.7, 12), mat);
+                    j1.position.x = -0.2;
+                    const j2 = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.7, 12), mat);
+                    j2.position.x = 0.2;
+                    jpGroup.add(j1); jpGroup.add(j2);
+                    jpGroup.position.set(x, 1.2, z);
+                    itemMesh = jpGroup;
+                } else {
+                    let col = (pType === 'magnet') ? 0x00f0ff : 0xff0055;
+                    const mat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.5 });
+                    itemMesh = new THREE.Mesh(this.geos.powerup, mat);
+                    itemMesh.position.set(x, 1.2, z);
+                }
+
+                itemMesh.userData = { type: pType, x: x, y: 1.2, z: z };
+                this.scene.add(itemMesh);
+                this.activePowerupItems.push(itemMesh);
+            }
+
+            bindEvents() {
+                window.addEventListener('resize', this.onResize.bind(this));
+                document.addEventListener('keydown', this.handleKeyDown.bind(this));
+                this.container.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+                this.container.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
+
+                document.querySelectorAll('.char-opt').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.char-opt').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        selectedCharacter = e.target.dataset.char;
+                        this.loadImportedCharacter(selectedCharacter);
+                    });
+                });
+
+                document.querySelectorAll('.speed-opt').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.speed-opt').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        selectedSpeedMode = e.target.dataset.speed;
+                    });
+                });
+
+                document.getElementById('start-btn').addEventListener('click', () => this.startGame());
+                document.getElementById('restart-btn').addEventListener('click', () => this.startGame());
+                document.getElementById('resume-btn').addEventListener('click', () => this.togglePause());
+                document.getElementById('quit-btn').addEventListener('click', () => this.showMainMenu());
+                document.getElementById('menu-btn').addEventListener('click', () => this.showMainMenu());
+                document.getElementById('pause-btn').addEventListener('click', () => this.togglePause());
+                document.getElementById('shop-btn').addEventListener('click', () => this.showShop());
+                document.getElementById('close-shop-btn').addEventListener('click', () => this.hideShop());
+                
+                document.getElementById('sound-btn').addEventListener('click', () => {
+                    audio.muted = !audio.muted;
+                    document.getElementById('sound-btn').innerText = audio.muted ? '🔇' : '🔊';
+                });
+            }
+
+            handleTouchStart(e) {
+                if (!e.touches || e.touches.length !== 1) return;
+                e.preventDefault();
+                this.touchStartX = e.touches[0].clientX;
+                this.touchStartY = e.touches[0].clientY;
+            }
+
+            handleTouchEnd(e) {
+                if (!e.changedTouches || e.changedTouches.length !== 1) return;
+                e.preventDefault();
+
+                const touch = e.changedTouches[0];
+                const dx = touch.clientX - this.touchStartX;
+                const dy = touch.clientY - this.touchStartY;
+                const distance = Math.hypot(dx, dy);
+                const now = performance.now();
+
+                if (!this.active || this.paused) return;
+
+                if (distance < 32) {
+                    if (now - this.lastTapTime < 350) {
+                        this.activateHoverboard();
+                        this.lastTapTime = 0;
+                    } else {
+                        this.lastTapTime = now;
+                    }
+                    return;
+                }
+
+                this.lastTapTime = 0;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx < 0) this.moveLeft();
+                    else this.moveRight();
+                } else if (dy < 0) {
+                    this.jump();
+                } else {
+                    this.slide();
+                }
+            }
+
+            handleKeyDown(e) {
+                if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                    if (this.active) this.togglePause();
+                    return;
+                }
+                if (!this.active || this.paused) return;
+
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.moveLeft();
+                else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.moveRight();
+                else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.jump();
+                else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.slide();
+                else if (e.key === ' ') this.activateHoverboard();
+            }
+
+            moveLeft() {
+                if (this.currentLane > 0) {
+                    this.currentLane--;
+                    this.targetX = CONFIG.LANES[this.currentLane];
+                }
+            }
+
+            moveRight() {
+                if (this.currentLane < 2) {
+                    this.currentLane++;
+                    this.targetX = CONFIG.LANES[this.currentLane];
+                }
+            }
+
+            jump() {
+                if (!this.isJumping && !this.isSliding) {
+                    this.isJumping = true;
+                    const force = (this.activePowerups.sneakers > 0) ? CONFIG.JUMP_FORCE * 1.5 : CONFIG.JUMP_FORCE;
+                    this.velY = force;
+                    audio.playJump();
+                }
+            }
+
+            slide() {
+                if (!this.isSliding) {
+                    this.isSliding = true;
+                    this.slideTimer = 26;
+                    if (this.isJumping) this.velY = -CONFIG.JUMP_FORCE * 1.3;
+                    audio.playSlide();
+                }
+            }
+
+            activateHoverboard() {
+                if (userData.hoverboards > 0 && this.activePowerups.hoverboard <= 0) {
+                    userData.hoverboards--;
+                    this.activePowerups.hoverboard = 20;
+                    SaveSystem.save(userData);
+                    this.updateUI();
+                }
+            }
+
+            startGame() {
+                const preset = SPEED_PRESETS[selectedSpeedMode];
+                this.speed = preset.initial;
+                this.maxSpeed = preset.max;
+                this.speedAccel = preset.accel;
+
+                this.active = true;
+                this.paused = false;
+                this.score = 0;
+                this.coinsGained = 0;
+                this.currentLane = 1;
+                this.targetX = CONFIG.LANES[this.currentLane];
+                this.posX = 0; this.posY = 0; this.posZ = 0;
+                this.velY = 0;
+                this.isJumping = false; this.isSliding = false;
+                this.slideTimer = 0; this.isOnTrain = false; this.isClimbingRamp = false;
+                this.segmentCount = 0;
+
+                for (let k in this.activePowerups) this.activePowerups[k] = 0;
+
+                this.activeSegments.forEach(s => this.scene.remove(s));
+                this.activeObstacles.forEach(o => this.scene.remove(o));
+                this.activeCoins.forEach(c => this.scene.remove(c));
+                this.activePowerupItems.forEach(p => this.scene.remove(p));
+
+                this.activeSegments = [];
+                this.activeObstacles = [];
+                this.activeCoins = [];
+                this.activePowerupItems = [];
+
+                this.playerGroup.position.set(0, 0, 0);
+
+                for (let i = 0; i < CONFIG.VISIBLE_SEGMENTS; i++) {
+                    this.createSegment(-i * CONFIG.SEGMENT_LENGTH);
+                }
+
+                document.getElementById('start-screen').classList.add('hidden');
+                document.getElementById('game-over-screen').classList.add('hidden');
+                document.getElementById('pause-screen').classList.add('hidden');
+
+                this.updateUI();
+            }
+
+            togglePause() {
+                if (!this.active) return;
+                this.paused = !this.paused;
+                document.getElementById('pause-screen').classList.toggle('hidden', !this.paused);
+            }
+
+            showMainMenu() {
+                this.active = false;
+                this.paused = false;
+                document.getElementById('start-screen').classList.remove('hidden');
+                document.getElementById('pause-screen').classList.add('hidden');
+                document.getElementById('game-over-screen').classList.add('hidden');
+                this.updateUI();
+            }
+
+            gameOver(msg = "Slammed into train!") {
+                this.active = false;
+                audio.playCrash();
+
+                let isNewRecord = false;
+                if (Math.floor(this.score) > userData.highScore) {
+                    userData.highScore = Math.floor(this.score);
+                    isNewRecord = true;
+                }
+                userData.coins += this.coinsGained;
+                SaveSystem.save(userData);
+
+                document.getElementById('game-over-msg').innerText = msg;
+                document.getElementById('final-score').innerText = Math.floor(this.score);
+                document.getElementById('final-coins').innerText = this.coinsGained;
+                document.getElementById('new-record-row').style.display = isNewRecord ? 'flex' : 'none';
+                document.getElementById('game-over-screen').classList.remove('hidden');
+
+                this.updateUI();
+            }
+
+            /* --- ENGINE LOOP --- */
+            update(delta) {
+                if (!this.active || this.paused) return;
+
+                if (this.speed < this.maxSpeed) {
+                    this.speed += this.speedAccel;
+                }
+
+                for (let key in this.activePowerups) {
+                    if (this.activePowerups[key] > 0) this.activePowerups[key] -= delta;
+                }
+
+                this.posX += (this.targetX - this.posX) * 0.35;
+
+                const targetBaseY = (this.activePowerups.jetpack > 0) ? 5.5 : (this.isOnTrain ? this.currentTrainY : 0);
+
+                if (this.isJumping || this.posY > targetBaseY) {
+                    this.posY += this.velY;
+                    this.velY -= CONFIG.GRAVITY;
+                    if (this.posY <= targetBaseY) {
+                        this.posY = targetBaseY;
+                        this.isJumping = false;
+                        this.velY = 0;
+                    }
+                } else {
+                    this.posY = targetBaseY;
+                }
+
+                this.playerGroup.position.set(this.posX, this.posY, this.posZ);
+
+                this.camera.position.x += (0 - this.camera.position.x) * 0.08;
+                this.camera.position.y += (12.5 - this.camera.position.y) * 0.08;
+                this.camera.position.z += (14.0 - this.camera.position.z) * 0.08;
+                this.camera.lookAt(this.posX * 0.08, 1.8 + this.posY * 0.06, -18);
+
+                if (this.isSliding) {
+                    this.slideTimer--;
+                    if (this.slideTimer <= 0) this.isSliding = false;
+                }
+
+                this.activeSegments.forEach(seg => seg.position.z += this.speed);
+                if (this.activeSegments[0].position.z > CONFIG.SEGMENT_LENGTH) {
+                    const oldSeg = this.activeSegments.shift();
+                    this.scene.remove(oldSeg);
+                    const lastZ = this.activeSegments[this.activeSegments.length - 1].position.z;
+                    this.createSegment(lastZ - CONFIG.SEGMENT_LENGTH);
+                }
+
+                const isMagnet = this.activePowerups.magnet > 0;
+                for (let i = this.activeCoins.length - 1; i >= 0; i--) {
+                    const coin = this.activeCoins[i];
+                    coin.position.z += this.speed;
+                    coin.rotation.z += 0.1;
+
+                    if (isMagnet && coin.position.z > -15) {
+                        coin.position.x += (this.posX - coin.position.x) * 0.3;
+                        coin.position.y += (this.posY + 1.0 - coin.position.y) * 0.3;
+                    }
+
+                    if (checkAABB(this.posX, this.posY + 0.9, 0, 0.8, 1.8, 0.8, coin.position.x, coin.position.y, coin.position.z, 0.7, 0.7, 0.7)) {
+                        this.coinsGained++;
+                        audio.playCoin();
+                        this.scene.remove(coin);
+                        this.activeCoins.splice(i, 1);
+                        continue;
+                    }
+
+                    if (coin.position.z > 8) {
+                        this.scene.remove(coin);
+                        this.activeCoins.splice(i, 1);
+                    }
+                }
+
+                for (let i = this.activePowerupItems.length - 1; i >= 0; i--) {
+                    const item = this.activePowerupItems[i];
+                    item.position.z += this.speed;
+                    item.rotation.y += 0.05;
+
+                    if (checkAABB(this.posX, this.posY + 0.9, 0, 0.8, 1.8, 0.8, item.position.x, item.position.y, item.position.z, 0.8, 0.8, 0.8)) {
+                        this.activePowerups[item.userData.type] = 12;
+                        audio.playPowerup();
+                        this.scene.remove(item);
+                        this.activePowerupItems.splice(i, 1);
+                        continue;
+                    }
+
+                    if (item.position.z > 8) {
+                        this.scene.remove(item);
+                        this.activePowerupItems.splice(i, 1);
+                    }
+                }
+
+                // OBSTACLES & RAMP CLIMBING LOGIC
+                this.isOnTrain = false;
+                this.isClimbingRamp = false;
+                const pW = 0.7;
+                const pH = this.isSliding ? 0.7 : 1.8;
+                const pY = this.isSliding ? 0.4 : 0.9;
+
+                for (let i = this.activeObstacles.length - 1; i >= 0; i--) {
+                    const obs = this.activeObstacles[i];
+                    let isRampClimbing = false;
+                    
+                    if (obs.userData.type === 'moving_train') {
+                        obs.position.z += this.speed + obs.userData.speed;
+                    } else {
+                        obs.position.z += this.speed;
+                    }
+
+                    if (obs.userData.type === 'train' || obs.userData.type === 'moving_train') {
+                        if (Math.abs(this.posX - obs.position.x) < 1.3) {
+                            const rampFront = obs.position.z + 11.5;
+                            const rampTop = obs.position.z + 5.5;
+                            const trainBack = obs.position.z - 7.0;
+
+                            if (obs.userData.hasRamp && 0 >= rampTop && 0 <= rampFront) {
+                                const progress = (rampFront - 0) / (rampFront - rampTop);
+                                const rampFloorY = Math.min(obs.userData.height, Math.max(0, progress * obs.userData.height));
+
+                                if (!this.isJumping) {
+                                    this.posY += (rampFloorY - this.posY) * 0.4;
+                                    this.isClimbingRamp = true;
+                                }
+                                this.isOnTrain = true;
+                                this.currentTrainY = obs.userData.height;
+                                isRampClimbing = true;
+                            }
+                            else if (0 >= trainBack && 0 <= rampTop) {
+                                if (this.posY >= obs.userData.height - 0.4) {
+                                    this.isOnTrain = true;
+                                    this.currentTrainY = obs.userData.height;
+                                    isRampClimbing = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!isRampClimbing && checkAABB(this.posX, this.posY + pY, 0, pW, pH, pW, obs.position.x, obs.userData.y + (obs.userData.h/2), obs.position.z, obs.userData.w, obs.userData.h, obs.userData.d)) {
+                        if (this.activePowerups.jetpack > 0) continue;
+
+                        if (this.activePowerups.hoverboard > 0) {
+                            this.activePowerups.hoverboard = 0;
+                            audio.playCrash();
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+                            continue;
+                        }
+
+                        let deathMsg = "Slammed into train!";
+                        if (obs.userData.type === 'hurdle') deathMsg = "Slammed into barrier!";
+                        else if (obs.userData.type === 'cones') deathMsg = "Crashed into construction cones!";
+
+                        this.gameOver(deathMsg);
+                        return;
+                    }
+
+                    if (obs.position.z > 12) {
+                        this.scene.remove(obs);
+                        this.activeObstacles.splice(i, 1);
+                    }
+                }
+
+                // Jetpack Visibility Toggle
+                if (this.jetpackMesh) {
+                    this.jetpackMesh.visible = (this.activePowerups.jetpack > 0);
+                }
+
+                // Reset transform every frame so sliding/ducking & climbing return to baseline
+                this.playerRig.rotation.x = 0;
+                this.playerRig.scale.set(1, 1, 1);
+
+                if (this.activePowerups.jetpack > 0) {
+                    this.playerRig.rotation.x = Math.PI / 6;
+                } else if (this.activePowerups.hoverboard > 0) {
+                    this.playerRig.rotation.x = 0;
+                } else if (this.isClimbingRamp) {
+                    this.playerRig.rotation.x = -Math.PI / 8;
+                } else if (this.isSliding) {
+                    this.playerRig.scale.set(1, 0.45, 1.2);
+                    this.playerRig.rotation.x = Math.PI / 6;
+                }
+
+                const mult = (this.activePowerups.multiplier > 0) ? 2 : 1;
+                this.score += this.speed * mult * 2.0;
+
+                this.updateUI();
+            }
+
+            updateUI() {
+                document.getElementById('score-val').innerText = Math.floor(this.score);
+                document.getElementById('coin-val').innerText = this.coinsGained;
+                document.getElementById('high-score-val').innerText = userData.highScore;
+                document.getElementById('total-coins-val').innerText = userData.coins;
+                document.getElementById('mult-val').innerText = (this.activePowerups.multiplier > 0) ? 'x2' : 'x1';
+                document.getElementById('board-count').innerText = userData.hoverboards;
+
+                const pContainer = document.getElementById('powerup-container');
+                pContainer.innerHTML = '';
+                for(let k in this.activePowerups) {
+                    if (this.activePowerups[k] > 0 && k !== 'hoverboard') {
+                        const pct = Math.max(0, (this.activePowerups[k] / 12) * 100);
+                        const bar = document.createElement('div');
+                        bar.className = 'powerup-bar';
+                        bar.innerHTML = `
+                            <div class="powerup-info"><span>${k.toUpperCase()}</span><span>${Math.ceil(this.activePowerups[k])}s</span></div>
+                            <div class="powerup-progress-bg"><div class="powerup-progress-fill" style="width:${pct}%"></div></div>
+                        `;
+                        pContainer.appendChild(bar);
+                    }
+                }
+            }
+
+            showShop() {
+                document.getElementById('shop-coin-val').innerText = userData.coins;
+                const itemsList = document.getElementById('shop-items-list');
+                itemsList.innerHTML = '';
+                const shopData = [
+                    { id: 'hoverboard', name: 'Hoverboard Shield', cost: 100 },
+                    { id: 'magnet', name: 'Magnet Duration', cost: 150 },
+                    { id: 'jetpack', name: 'Jetpack Duration', cost: 200 }
+                ];
+                shopData.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'shop-item';
+                    row.innerHTML = `
+                        <div><h4>${item.name}</h4></div>
+                        <button class="buy-btn" ${userData.coins < item.cost ? 'disabled' : ''}>🪙 ${item.cost} BUY</button>
+                    `;
+                    row.querySelector('.buy-btn').addEventListener('click', () => {
+                        if (userData.coins >= item.cost) {
+                            userData.coins -= item.cost;
+                            if (item.id === 'hoverboard') userData.hoverboards++;
+                            SaveSystem.save(userData);
+                            this.showShop();
+                            this.updateUI();
+                        }
+                    });
+                    itemsList.appendChild(row);
+                });
+                document.getElementById('shop-screen').classList.remove('hidden');
+            }
+
+            hideShop() {
+                document.getElementById('shop-screen').classList.add('hidden');
+            }
+
+            render(now) {
+                const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1);
+                this.lastFrameTime = now;
+
+                this.frameCount++;
+                if (now - this.lastFpsTime >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsTime));
+                    document.getElementById('fps-val').innerText = `${this.fps} FPS`;
+                    this.frameCount = 0;
+                    this.lastFpsTime = now;
+                }
+
+                if (this.mixer) {
+                    this.mixer.update(delta);
+                }
+
+                this.update(delta);
+                this.renderer.render(this.scene, this.camera);
+                requestAnimationFrame(this.render.bind(this));
+            }
+
+            onResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        }
+
+        window.onload = () => {
+            window.game = new GameEngine();
+        };
+    </script>
+</body>
+</html>
