@@ -120,6 +120,33 @@
             transition: width 0.1s linear;
         }
 
+        /* Shield Active Indicator */
+        .shield-active-indicator {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 0, 85, 0.9);
+            border: 2px solid #ff0055;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: 800;
+            font-size: 14px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            z-index: 15;
+            animation: pulse 1s infinite;
+        }
+        .shield-active-indicator.active {
+            display: flex;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.05); }
+        }
+
         /* BOTTOM HUD */
         .hud-bottom {
             display: flex;
@@ -316,6 +343,11 @@
                     <div class="hud-card score">⚡ <span id="score-val">0</span></div>
                     <div class="hud-card coins">🪙 <span id="coin-val">0</span></div>
                     <div id="powerup-container"></div>
+                </div>
+
+                <!-- Shield Active Indicator -->
+                <div class="shield-active-indicator" id="shield-indicator">
+                    🛡️ SHIELD ACTIVE
                 </div>
 
                 <div class="hud-right">
@@ -1893,6 +1925,12 @@
                 document.getElementById('game-over-screen').classList.add('hidden');
                 document.getElementById('pause-screen').classList.add('hidden');
 
+                // Hide shield indicator at game start
+                const shieldIndicator = document.getElementById('shield-indicator');
+                if (shieldIndicator) {
+                    shieldIndicator.classList.remove('active');
+                }
+
                 this.updateUI();
             }
 
@@ -2226,6 +2264,16 @@
                 document.getElementById('high-score-val').innerText = userData.highScore;
                 document.getElementById('total-coins-val').innerText = userData.coins;
                 document.getElementById('board-count').innerText = userData.Shields;
+
+                // Update shield indicator visibility
+                const shieldIndicator = document.getElementById('shield-indicator');
+                if (shieldIndicator) {
+                    if (this.active && this.activePowerups.Shield > 0) {
+                        shieldIndicator.classList.add('active');
+                    } else {
+                        shieldIndicator.classList.remove('active');
+                    }
+                }
 
                 const pContainer = document.getElementById('powerup-container');
                 pContainer.innerHTML = '';
