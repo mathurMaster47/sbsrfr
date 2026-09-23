@@ -753,6 +753,7 @@
                 this.initGeometriesAndMaterials();
                 this.loadImportedGLTFAssets();
                 this.createPlayerModel();
+                this.initPursuers();
                 this.bindEvents();
                 this.updateUI();
 
@@ -976,6 +977,200 @@
                 }, undefined, (error) => {
                     console.warn('Boy asset could not be loaded; using the built-in runner.', error);
                 });
+            }
+
+            /* --- COP CHARACTER MODEL (Like original Subway Surfers) --- */
+            createCopModel() {
+                const copGroup = new THREE.Group();
+
+                // Police uniform materials
+                const uniformMat = new THREE.MeshStandardMaterial({ color: 0x1a237e }); // Dark navy blue
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+                const beltMat = new THREE.MeshStandardMaterial({ color: 0x2d1b12 });
+                const shoeMat = new THREE.MeshStandardMaterial({ color: 0x111827 });
+
+                // Torso (police uniform)
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.55), uniformMat);
+                torso.position.y = 1.35;
+                copGroup.add(torso);
+
+                // Head
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), skinMat);
+                head.position.y = 2.15;
+                copGroup.add(head);
+
+                // Police cap
+                const capBrim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.3), uniformMat);
+                capBrim.position.set(0, 2.45, 0.15);
+                copGroup.add(capBrim);
+                const capTop = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.25), uniformMat);
+                capTop.position.set(0, 2.5, 0);
+                copGroup.add(capTop);
+
+                // Arms (store references for animation)
+                const armGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.85, 8);
+                const armLeft = new THREE.Mesh(armGeo, uniformMat);
+                const armRight = armLeft.clone();
+                armLeft.position.set(-0.55, 1.4, 0);
+                armRight.position.set(0.55, 1.4, 0);
+                armLeft.rotation.z = -0.15;
+                armRight.rotation.z = 0.15;
+                copGroup.add(armLeft, armRight);
+                copGroup.userData.armLeft = armLeft;
+                copGroup.userData.armRight = armRight;
+
+                // Legs (store references for animation)
+                const legGeo = new THREE.CylinderGeometry(0.15, 0.17, 0.9, 8);
+                const legLeft = new THREE.Mesh(legGeo, uniformMat);
+                const legRight = legLeft.clone();
+                legLeft.position.set(-0.22, 0.5, 0);
+                legRight.position.set(0.22, 0.5, 0);
+                copGroup.add(legLeft, legRight);
+                copGroup.userData.legLeft = legLeft;
+                copGroup.userData.legRight = legRight;
+
+                // Shoes
+                const shoeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.15, 0.55), shoeMat);
+                const shoeRight = shoeLeft.clone();
+                shoeLeft.position.set(-0.22, 0.05, -0.12);
+                shoeRight.position.set(0.22, 0.05, -0.12);
+                copGroup.add(shoeLeft, shoeRight);
+
+                // Belt
+                const belt = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.35), beltMat);
+                belt.position.y = 0.8;
+                copGroup.add(belt);
+
+                return copGroup;
+            }
+
+            /* --- DOG CHARACTER MODEL (Like original Subway Surfers) --- */
+            createDogModel() {
+                const dogGroup = new THREE.Group();
+
+                // Dog materials
+                const furMat = new THREE.MeshStandardMaterial({ color: 0xd4a574 }); // Brown/tan
+                const darkFurMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 }); // Dark brown
+                const noseMat = new THREE.MeshStandardMaterial({ color: 0x111827 });
+
+                // Body
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.9), furMat);
+                body.position.y = 0.5;
+                dogGroup.add(body);
+
+                // Head
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.4), furMat);
+                head.position.set(0, 0.75, 0.45);
+                dogGroup.add(head);
+
+                // Snout
+                const snout = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.25), darkFurMat);
+                snout.position.set(0, 0.65, 0.7);
+                dogGroup.add(snout);
+
+                // Nose
+                const nose = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), noseMat);
+                nose.position.set(0, 0.7, 0.85);
+                dogGroup.add(nose);
+
+                // Ears
+                const earGeo = new THREE.BoxGeometry(0.12, 0.2, 0.08);
+                const earLeft = new THREE.Mesh(earGeo, darkFurMat);
+                const earRight = earLeft.clone();
+                earLeft.position.set(-0.18, 0.95, 0.4);
+                earRight.position.set(0.18, 0.95, 0.4);
+                earLeft.rotation.z = 0.3;
+                earRight.rotation.z = -0.3;
+                dogGroup.add(earLeft, earRight);
+
+                // Legs (store references for animation)
+                const legGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.35, 6);
+                const legPositions = [
+                    [-0.2, 0.15, 0.3], [0.2, 0.15, 0.3],  // Front legs
+                    [-0.2, 0.15, -0.3], [0.2, 0.15, -0.3] // Back legs
+                ];
+                const dogLegs = [];
+                legPositions.forEach(pos => {
+                    const leg = new THREE.Mesh(legGeo, furMat);
+                    leg.position.set(...pos);
+                    dogGroup.add(leg);
+                    dogLegs.push(leg);
+                });
+                dogGroup.userData.legs = dogLegs;
+
+                // Tail
+                const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.25), furMat);
+                tail.position.set(0, 0.6, -0.55);
+                tail.rotation.x = 0.3;
+                dogGroup.add(tail);
+
+                return dogGroup;
+            }
+
+            /* --- INITIALIZE COP AND DOG PURSUERS --- */
+            initPursuers() {
+                // Create cop character
+                this.copGroup = this.createCopModel();
+                this.copGroup.position.set(0, 0, 8); // Start behind player
+                this.copGroup.scale.set(1.8, 1.8, 1.8);
+                this.scene.add(this.copGroup);
+
+                // Create dog character
+                this.dogGroup = this.createDogModel();
+                this.dogGroup.position.set(1.2, 0, 9); // Start behind and to the side
+                this.dogGroup.scale.set(1.8, 1.8, 1.8);
+                this.scene.add(this.dogGroup);
+
+                this.copAnimPhase = 0;
+                this.dogAnimPhase = 0;
+            }
+
+            /* --- UPDATE COP AND DOG PURSUERS --- */
+            updatePursuers(delta) {
+                if (!this.copGroup || !this.dogGroup) return;
+
+                // Make cop follow player with slight delay and offset
+                const copTargetX = this.posX * 0.6; // Follow but with some lag
+                const copTargetZ = 8 + (this.speed * 0.1); // Maintain distance based on speed
+
+                this.copGroup.position.x += (copTargetX - this.copGroup.position.x) * 0.08;
+                this.copGroup.position.z = copTargetZ;
+
+                // Make dog run around cop
+                this.dogAnimPhase += delta * 8;
+                const dogOrbitRadius = 1.5;
+                const dogOrbitX = Math.sin(this.dogAnimPhase) * dogOrbitRadius;
+                const dogOrbitZ = Math.cos(this.dogAnimPhase) * dogOrbitRadius;
+
+                this.dogGroup.position.x = this.copGroup.position.x + dogOrbitX;
+                this.dogGroup.position.z = this.copGroup.position.z + dogOrbitZ + 1.0;
+
+                // Animate cop running motion using stored references
+                this.copAnimPhase += delta * 10;
+                const copLegSwing = Math.sin(this.copAnimPhase) * 0.3;
+                const copArmSwing = Math.sin(this.copAnimPhase) * 0.25;
+
+                if (this.copGroup.userData.legLeft && this.copGroup.userData.legRight) {
+                    this.copGroup.userData.legLeft.rotation.x = copLegSwing;
+                    this.copGroup.userData.legRight.rotation.x = -copLegSwing;
+                }
+                if (this.copGroup.userData.armLeft && this.copGroup.userData.armRight) {
+                    this.copGroup.userData.armLeft.rotation.x = copArmSwing;
+                    this.copGroup.userData.armRight.rotation.x = -copArmSwing;
+                }
+
+                // Animate dog running motion using stored references
+                const dogLegSwing = Math.sin(this.dogAnimPhase * 1.5) * 0.4;
+                if (this.dogGroup.userData.legs && this.dogGroup.userData.legs.length === 4) {
+                    this.dogGroup.userData.legs[0].rotation.x = dogLegSwing;  // Front left
+                    this.dogGroup.userData.legs[1].rotation.x = -dogLegSwing; // Front right
+                    this.dogGroup.userData.legs[2].rotation.x = -dogLegSwing; // Back left
+                    this.dogGroup.userData.legs[3].rotation.x = dogLegSwing;  // Back right
+                }
+
+                // Make dog look at player direction
+                this.dogGroup.lookAt(this.posX, 0.5, this.posZ - 5);
+                this.copGroup.lookAt(this.posX, 1.5, this.posZ - 5);
             }
 
             createSegment(zPos) {
@@ -1477,6 +1672,14 @@
 
                 this.playerGroup.position.set(0, 0, 0);
 
+                // Reset cop and dog positions
+                if (this.copGroup) {
+                    this.copGroup.position.set(0, 0, 8);
+                }
+                if (this.dogGroup) {
+                    this.dogGroup.position.set(1.2, 0, 9);
+                }
+
                 for (let i = 0; i < CONFIG.VISIBLE_SEGMENTS; i++) {
                     this.createSegment(-i * CONFIG.SEGMENT_LENGTH);
                 }
@@ -1553,6 +1756,9 @@
                 }
 
                 this.playerGroup.position.set(this.posX, this.posY, this.posZ);
+
+                // Update cop and dog pursuers
+                this.updatePursuers(delta);
 
                 this.camera.position.x += (0 - this.camera.position.x) * 0.08;
                 this.camera.position.y += (12.5 - this.camera.position.y) * 0.08;
