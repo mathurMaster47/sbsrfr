@@ -1970,9 +1970,143 @@
                 this.updateUI();
             }
 
+            /* --- TOP PRIORITY COLLISION DETECTION --- */
+            checkCollisions() {
+                const pW = 0.7;
+                const pH = this.isSliding ? 0.7 : 1.8;
+                const pY = this.isSliding ? 0.4 : 0.9;
+
+                for (let i = this.activeObstacles.length - 1; i >= 0; i--) {
+                    const obs = this.activeObstacles[i];
+
+                    // Move obstacles
+                    if (obs.userData.type === 'moving_train') {
+                        // Check for train-to-train collision and prevent overlap
+                        let wouldCollide = false;
+                        for (let j = this.activeObstacles.length - 1; j >= 0; j--) {
+                            if (i === j) continue;
+                            const other = this.activeObstacles[j];
+                            if (other.userData.type === 'train' || other.userData.type === 'moving_train') {
+                                const zDist = Math.abs(obs.position.z - other.position.z);
+                                const xDist = Math.abs(obs.position.x - other.position.x);
+                                // If trains are too close in same lane, stop the moving train
+                                if (zDist < 15 && xDist < 1.0) {
+                                    wouldCollide = true;
+                                    break;
+                                }
+                            }
+                        }
+                        // Only move if no collision would occur
+                        if (!wouldCollide) {
+                            obs.position.z += this.speed + obs.userData.speed;
+                        } else {
+                            obs.position.z += this.speed; // Move at normal speed to avoid collision
+                        }
+                    } else {
+                        obs.position.z += this.speed;
+                    }
+
+                    // Remove obstacles that have passed the camera
+                    if (obs.position.z > 12) {
+                        this.scene.remove(obs);
+                        this.activeObstacles.splice(i, 1);
+                        continue;
+                    }
+
+                    // Check collision with player
+                    if (checkAABB(this.posX, this.posY + pY, 0, pW, pH, pW, obs.position.x, obs.userData.y + (obs.userData.h/2), obs.position.z, obs.userData.w, obs.userData.h, obs.userData.d)) {
+                        if (this.activePowerups.jetpack > 0) continue;
+
+                        // Check collision cooldown
+                        if (this.collisionCooldown > 0) continue;
+
+                        // First check if player has shields in inventory (auto-protect)
+                        if (userData.Shields > 0) {
+                            // Auto-activate and consume a shield
+                            userData.Shields--;
+                            SaveSystem.save(userData);
+                            audio.playCrash();
+                            this.triggerCopReappearance();
+                            this.bouncePlayerBack();
+                            // Show shield briefly
+                            this.ShieldMesh.visible = true;
+                            setTimeout(() => {
+                                this.ShieldMesh.visible = false;
+                            }, 500);
+                            // Remove obstacle to prevent repeated collision
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+                            return; // Exit immediately after collision
+                        }
+
+                        // Then check if shield is already active
+                        if (this.activePowerups.Shield > 0) {
+                            this.activePowerups.Shield = 0;
+                            audio.playCrash();
+                            this.triggerCopReappearance();
+                            this.bouncePlayerBack();
+                            // Remove obstacle to prevent repeated collision
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+                            return; // Exit immediately after collision
+                        }
+
+                        // Determine collision type and severity
+                        const isTrainCollision = (obs.userData.type === 'train' || obs.userData.type === 'moving_train');
+                        const isHeadOnCollision = (Math.abs(this.posX - obs.position.x) < 0.5); // Direct hit
+                        const isSideCollision = !isHeadOnCollision;
+
+                        if (isTrainCollision && isHeadOnCollision) {
+                            // Fatal head-on train collision - dramatic sequence
+                            this.triggerFatalEncounter();
+
+                            // Remove train to prevent repeated collision during sequence
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+
+                            // Delay game over to show the gun drawing sequence
+                            setTimeout(() => {
+                                let deathMsg = "Slammed into train!";
+                                this.gameOver(deathMsg);
+                            }, 500); // 0.5 second delay to show cop pulling gun
+                            return; // Exit immediately after fatal collision
+                        } else if (isTrainCollision && isSideCollision) {
+                            // Side train collision - bounce back and police warning
+                            audio.playCrash();
+                            this.triggerCopReappearance();
+                            this.bouncePlayerBack();
+
+                            // Remove train to prevent repeated collision
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+
+                            // Check if police should catch player (after 2 warnings)
+                            if (this.policeWarningCount >= 2) {
+                                let deathMsg = "Caught by police!";
+                                this.gameOver(deathMsg);
+                                return;
+                            }
+                        } else {
+                            // Non-train obstacle collision - bounce back and warning
+                            audio.playCrash();
+                            this.triggerCopReappearance();
+                            this.bouncePlayerBack();
+
+                            // Remove obstacle
+                            this.scene.remove(obs);
+                            this.activeObstacles.splice(i, 1);
+                            return;
+                        }
+                    }
+                }
+            }
+
             /* --- ENGINE LOOP --- */
             update(delta) {
                 if (!this.active || this.paused) return;
+
+                // TOP PRIORITY: Collision detection first
+                this.checkCollisions();
 
                 if (this.speed < this.maxSpeed) {
                     this.speed += this.speedAccel;
@@ -2070,42 +2204,12 @@
                     }
                 }
 
-                // OBSTACLES & RAMP CLIMBING LOGIC
+                // RAMP CLIMBING LOGIC (obstacle movement and collision handled in checkCollisions)
                 this.isOnTrain = false;
                 this.isClimbingRamp = false;
-                const pW = 0.7;
-                const pH = this.isSliding ? 0.7 : 1.8;
-                const pY = this.isSliding ? 0.4 : 0.9;
 
                 for (let i = this.activeObstacles.length - 1; i >= 0; i--) {
                     const obs = this.activeObstacles[i];
-                    let isRampClimbing = false;
-                    
-                    if (obs.userData.type === 'moving_train') {
-                        // Check for train-to-train collision and prevent overlap
-                        let wouldCollide = false;
-                        for (let j = this.activeObstacles.length - 1; j >= 0; j--) {
-                            if (i === j) continue;
-                            const other = this.activeObstacles[j];
-                            if (other.userData.type === 'train' || other.userData.type === 'moving_train') {
-                                const zDist = Math.abs(obs.position.z - other.position.z);
-                                const xDist = Math.abs(obs.position.x - other.position.x);
-                                // If trains are too close in same lane, stop the moving train
-                                if (zDist < 15 && xDist < 1.0) {
-                                    wouldCollide = true;
-                                    break;
-                                }
-                            }
-                        }
-                        // Only move if no collision would occur
-                        if (!wouldCollide) {
-                            obs.position.z += this.speed + obs.userData.speed;
-                        } else {
-                            obs.position.z += this.speed; // Move at normal speed to avoid collision
-                        }
-                    } else {
-                        obs.position.z += this.speed;
-                    }
 
                     if (obs.userData.type === 'train' || obs.userData.type === 'moving_train') {
                         if (Math.abs(this.posX - obs.position.x) < 1.3) {
@@ -2123,108 +2227,14 @@
                                 }
                                 this.isOnTrain = true;
                                 this.currentTrainY = obs.userData.height;
-                                isRampClimbing = true;
                             }
                             else if (0 >= trainBack && 0 <= rampTop) {
                                 if (this.posY >= obs.userData.height - 0.4) {
                                     this.isOnTrain = true;
                                     this.currentTrainY = obs.userData.height;
-                                    isRampClimbing = true;
                                 }
                             }
                         }
-                    }
-
-                    if (!isRampClimbing && checkAABB(this.posX, this.posY + pY, 0, pW, pH, pW, obs.position.x, obs.userData.y + (obs.userData.h/2), obs.position.z, obs.userData.w, obs.userData.h, obs.userData.d)) {
-                        if (this.activePowerups.jetpack > 0) continue;
-
-                        // Check collision cooldown
-                        if (this.collisionCooldown > 0) continue;
-
-                        // First check if player has shields in inventory (auto-protect)
-                        if (userData.Shields > 0) {
-                            // Auto-activate and consume a shield
-                            userData.Shields--;
-                            SaveSystem.save(userData);
-                            audio.playCrash();
-                            this.triggerCopReappearance();
-                            this.bouncePlayerBack();
-                            // Show shield briefly
-                            this.ShieldMesh.visible = true;
-                            setTimeout(() => {
-                                this.ShieldMesh.visible = false;
-                            }, 500);
-                            // Remove obstacle to prevent repeated collision
-                            this.scene.remove(obs);
-                            this.activeObstacles.splice(i, 1);
-                            continue;
-                        }
-
-                        // Then check if shield is already active
-                        if (this.activePowerups.Shield > 0) {
-                            this.activePowerups.Shield = 0;
-                            audio.playCrash();
-                            this.triggerCopReappearance();
-                            this.bouncePlayerBack();
-                            // Remove obstacle to prevent repeated collision
-                            this.scene.remove(obs);
-                            this.activeObstacles.splice(i, 1);
-                            continue;
-                        }
-
-                        // Determine collision type and severity
-                        const isTrainCollision = (obs.userData.type === 'train' || obs.userData.type === 'moving_train');
-                        const isHeadOnCollision = (Math.abs(this.posX - obs.position.x) < 0.5); // Direct hit
-                        const isSideCollision = !isHeadOnCollision;
-
-                        if (isTrainCollision && isHeadOnCollision) {
-                            // Fatal head-on train collision - dramatic sequence
-                            this.triggerFatalEncounter();
-
-                            // Remove train to prevent repeated collision during sequence
-                            this.scene.remove(obs);
-                            this.activeObstacles.splice(i, 1);
-
-                            // Delay game over to show the gun drawing sequence
-                            setTimeout(() => {
-                                let deathMsg = "Slammed into train!";
-                                this.gameOver(deathMsg);
-                            }, 1000); // 1 second delay to show cop pulling gun
-                            return;
-                        } else if (isTrainCollision && isSideCollision) {
-                            // Side train collision - bounce back and police warning
-                            audio.playCrash();
-                            this.triggerCopReappearance();
-                            this.bouncePlayerBack();
-
-                            // Remove train to prevent repeated collision
-                            this.scene.remove(obs);
-                            this.activeObstacles.splice(i, 1);
-
-                            // Check if police should catch player (after 2 warnings)
-                            if (this.policeWarningCount >= 2) {
-                                setTimeout(() => {
-                                    let deathMsg = "Caught by police!";
-                                    this.gameOver(deathMsg);
-                                }, 500);
-                                return;
-                            }
-                        } else {
-                            // Non-train obstacle collision - bounce back and warning
-                            audio.playCrash();
-                            this.triggerCopReappearance();
-                            this.bouncePlayerBack();
-
-                            // Remove obstacle
-                            this.scene.remove(obs);
-                            this.activeObstacles.splice(i, 1);
-                            continue;
-                        }
-                    }
-
-                    if (obs.position.z > 12) {
-                        this.scene.remove(obs);
-                        this.activeObstacles.splice(i, 1);
                     }
                 }
 
