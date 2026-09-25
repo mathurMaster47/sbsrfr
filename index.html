@@ -1978,6 +1978,7 @@
 
                 for (let i = this.activeObstacles.length - 1; i >= 0; i--) {
                     const obs = this.activeObstacles[i];
+                    let isRampClimbing = false;
 
                     // Move obstacles
                     if (obs.userData.type === 'moving_train') {
@@ -2013,8 +2014,37 @@
                         continue;
                     }
 
-                    // Check collision with player
-                    if (checkAABB(this.posX, this.posY + pY, 0, pW, pH, pW, obs.position.x, obs.userData.y + (obs.userData.h/2), obs.position.z, obs.userData.w, obs.userData.h, obs.userData.d)) {
+                    // Check for train ramp climbing BEFORE collision detection
+                    if (obs.userData.type === 'train' || obs.userData.type === 'moving_train') {
+                        if (Math.abs(this.posX - obs.position.x) < 1.3) {
+                            const rampFront = obs.position.z + 11.5;
+                            const rampTop = obs.position.z + 5.5;
+                            const trainBack = obs.position.z - 7.0;
+
+                            if (obs.userData.hasRamp && 0 >= rampTop && 0 <= rampFront) {
+                                const progress = (rampFront - 0) / (rampFront - rampTop);
+                                const rampFloorY = Math.min(obs.userData.height, Math.max(0, progress * obs.userData.height));
+
+                                if (!this.isJumping) {
+                                    this.posY = rampFloorY;
+                                    this.isClimbingRamp = true;
+                                }
+                                this.isOnTrain = true;
+                                this.currentTrainY = obs.userData.height;
+                                isRampClimbing = true;
+                            }
+                            else if (0 >= trainBack && 0 <= rampTop) {
+                                if (this.posY >= obs.userData.height - 0.4) {
+                                    this.isOnTrain = true;
+                                    this.currentTrainY = obs.userData.height;
+                                    isRampClimbing = true;
+                                }
+                            }
+                        }
+                    }
+
+                    // Check collision with player (skip if climbing ramp)
+                    if (!isRampClimbing && checkAABB(this.posX, this.posY + pY, 0, pW, pH, pW, obs.position.x, obs.userData.y + (obs.userData.h/2), obs.position.z, obs.userData.w, obs.userData.h, obs.userData.d)) {
                         if (this.activePowerups.jetpack > 0) continue;
 
                         // Check collision cooldown
@@ -2105,6 +2135,10 @@
             update(delta) {
                 if (!this.active || this.paused) return;
 
+                // Reset train climbing states at start of frame
+                this.isOnTrain = false;
+                this.isClimbingRamp = false;
+
                 // TOP PRIORITY: Collision detection first
                 this.checkCollisions();
 
@@ -2133,7 +2167,7 @@
                         this.isJumping = false;
                         this.velY = 0;
                     }
-                } else {
+                } else if (!this.isClimbingRamp) {
                     this.posY = targetBaseY;
                 }
 
@@ -2201,40 +2235,6 @@
                     if (item.position.z > 8) {
                         this.scene.remove(item);
                         this.activePowerupItems.splice(i, 1);
-                    }
-                }
-
-                // RAMP CLIMBING LOGIC (obstacle movement and collision handled in checkCollisions)
-                this.isOnTrain = false;
-                this.isClimbingRamp = false;
-
-                for (let i = this.activeObstacles.length - 1; i >= 0; i--) {
-                    const obs = this.activeObstacles[i];
-
-                    if (obs.userData.type === 'train' || obs.userData.type === 'moving_train') {
-                        if (Math.abs(this.posX - obs.position.x) < 1.3) {
-                            const rampFront = obs.position.z + 11.5;
-                            const rampTop = obs.position.z + 5.5;
-                            const trainBack = obs.position.z - 7.0;
-
-                            if (obs.userData.hasRamp && 0 >= rampTop && 0 <= rampFront) {
-                                const progress = (rampFront - 0) / (rampFront - rampTop);
-                                const rampFloorY = Math.min(obs.userData.height, Math.max(0, progress * obs.userData.height));
-
-                                if (!this.isJumping) {
-                                    this.posY += (rampFloorY - this.posY) * 0.4;
-                                    this.isClimbingRamp = true;
-                                }
-                                this.isOnTrain = true;
-                                this.currentTrainY = obs.userData.height;
-                            }
-                            else if (0 >= trainBack && 0 <= rampTop) {
-                                if (this.posY >= obs.userData.height - 0.4) {
-                                    this.isOnTrain = true;
-                                    this.currentTrainY = obs.userData.height;
-                                }
-                            }
-                        }
                     }
                 }
 
